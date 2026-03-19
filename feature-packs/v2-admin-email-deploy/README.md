@@ -2,6 +2,8 @@
 
 This package adds three major features on top of the base project:
 
+> Repository note: this is the first incremental feature pack. Apply it on top of `../../apps/anirate-base`; it is not a standalone application.
+
 ---
 
 ## 1 — Admin Dashboard UI

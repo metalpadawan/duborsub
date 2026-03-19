@@ -2,6 +2,8 @@
 
 Full-stack web app for community-driven anime ratings comparing sub and dub versions.
 
+> Repository note: this base app now lives in `apps/anirate-base`. The canonical SQL schema referenced below lives at `../../database/schema.sql`.
+
 **Stack**: Next.js 14 · NestJS · PostgreSQL · Prisma · Tailwind CSS
 
 ---
@@ -9,7 +11,7 @@ Full-stack web app for community-driven anime ratings comparing sub and dub vers
 ## Project Structure
 
 ```
-anime-platform/
+apps/anirate-base/
 ├── prisma/
 │   └── schema.prisma          # Shared Prisma schema
 ├── backend/                   # NestJS API
@@ -53,7 +55,7 @@ anime-platform/
 createdb anime_platform
 
 # Run the SQL schema (creates tables, triggers, views)
-psql anime_platform < schema.sql
+psql anime_platform < ../../database/schema.sql
 ```
 
 ### 2 — Backend

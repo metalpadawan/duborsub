@@ -2,6 +2,8 @@
 
 Five production-ready features added on top of the base platform.
 
+> Repository note: this is the second incremental feature pack. Apply it after `../../apps/anirate-base` and `../v2-admin-email-deploy`.
+
 ---
 
 ## What's included

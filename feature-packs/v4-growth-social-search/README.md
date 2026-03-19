@@ -2,6 +2,8 @@
 
 All five growth features. The platform is now feature-complete.
 
+> Repository note: this is the final incremental feature pack. Apply it after the base app plus the v2 and v3 packs in `../`.
+
 ---
 
 ## 1 — Recommendation engine
