@@ -1,37 +1,53 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AuthLayout } from '@/components/AuthLayout';
-import { useAuthStore } from '@/lib/auth.store';
+import { authApi } from '@/lib/api';
 
-export default function LoginPage() {
-  const router = useRouter();
-  const login = useAuthStore((state) => state.login);
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
+    setMessage('');
     setLoading(true);
 
     try {
-      await login(email, password);
-      router.push('/');
+      const response = await authApi.forgotPassword(email);
+      const token = response.data?.debugToken;
+      setMessage(
+        token
+          ? `Reset token for local testing: ${token}`
+          : 'If that email exists, a reset link has been sent.',
+      );
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Invalid credentials');
+      setError(err?.response?.data?.message ?? 'Unable to start password reset');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to rate and review anime">
+    <AuthLayout title="Reset your password" subtitle="We will generate a reset token for local testing">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {message ? (
+          <div
+            className="text-sm px-3 py-2 rounded-lg"
+            style={{
+              background: 'rgba(16,185,129,0.12)',
+              color: '#34d399',
+              border: '1px solid rgba(16,185,129,0.25)',
+            }}
+          >
+            {message}
+          </div>
+        ) : null}
+
         {error ? (
           <div
             className="text-sm px-3 py-2 rounded-lg"
@@ -59,33 +75,14 @@ export default function LoginPage() {
           />
         </div>
 
-        <div>
-          <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-3)' }}>
-            Password
-          </label>
-          <input
-            type="password"
-            className="input"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <div className="text-right mt-1">
-            <Link href="/forgot-password" className="text-xs" style={{ color: 'var(--text-3)' }}>
-              Forgot password?
-            </Link>
-          </div>
-        </div>
-
         <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign in'}
+          {loading ? 'Generating token...' : 'Generate reset token'}
         </button>
 
         <p className="text-center text-sm" style={{ color: 'var(--text-3)' }}>
-          No account?{' '}
-          <Link href="/register" style={{ color: 'var(--accent)' }}>
-            Create one
+          Back to{' '}
+          <Link href="/login" style={{ color: 'var(--accent)' }}>
+            Sign in
           </Link>
         </p>
       </form>

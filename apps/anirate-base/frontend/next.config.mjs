@@ -1,7 +1,4 @@
-// next.config.ts
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'cdn.myanimelist.net' },

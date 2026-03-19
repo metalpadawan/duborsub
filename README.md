@@ -37,6 +37,7 @@ The `feature-packs/` directories are not standalone applications. They are stage
 
 ## Notes
 
+- The reconstructed local base app currently runs with seeded in-memory data for easy startup.
 - The canonical SQL schema is `database/schema.sql`.
 - The duplicate SQL export was preserved as `archives/duplicates/schema-copy.sql`.
 - The original zip exports were moved to `archives/exports/`.

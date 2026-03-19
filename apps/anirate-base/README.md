@@ -3,6 +3,8 @@
 Full-stack web app for community-driven anime ratings comparing sub and dub versions.
 
 > Repository note: this base app now lives in `apps/anirate-base`. The canonical SQL schema referenced below lives at `../../database/schema.sql`.
+>
+> Local startup note: the reconstructed development version now boots with seeded in-memory data, so PostgreSQL is preserved for future wiring but is not required just to run the app locally.
 
 **Stack**: Next.js 14 · NestJS · PostgreSQL · Prisma · Tailwind CSS
 

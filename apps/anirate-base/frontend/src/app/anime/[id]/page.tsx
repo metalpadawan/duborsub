@@ -1,348 +1,320 @@
-// src/app/anime/[id]/page.tsx — Anime Detail Page
 'use client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import Image from 'next/image';
+
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { animeApi, ratingsApi, commentsApi } from '@/lib/api';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { SiteHeader } from '@/components/SiteHeader';
+import { animeApi, commentsApi, ratingsApi } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth.store';
 
 export default function AnimeDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const animeId = params.id;
   const { user } = useAuthStore();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
+  const [commentText, setCommentText] = useState('');
 
-  const { data: anime, isLoading } = useQuery({
-    queryKey: ['anime', id],
-    queryFn: () => animeApi.get(id).then((r) => r.data),
+  const animeQuery = useQuery({
+    queryKey: ['anime', animeId],
+    queryFn: async () => {
+      const response = await animeApi.get(animeId);
+      return response.data;
+    },
   });
 
-  const { data: myRating } = useQuery({
-    queryKey: ['rating', id],
-    queryFn: () => ratingsApi.mine(id).then((r) => r.data),
-    enabled: !!user,
+  const myRatingQuery = useQuery({
+    queryKey: ['rating', animeId],
+    queryFn: async () => {
+      const response = await ratingsApi.mine(animeId);
+      return response.data as { subRating?: number | null; dubRating?: number | null };
+    },
+    enabled: Boolean(user),
+  });
+
+  const commentsQuery = useQuery({
+    queryKey: ['comments', animeId],
+    queryFn: async () => {
+      const response = await commentsApi.list(animeId, { page: 1, limit: 20 });
+      return response.data;
+    },
   });
 
   const ratingMutation = useMutation({
-    mutationFn: (data: { subRating?: number; dubRating?: number }) =>
-      ratingsApi.upsert(id, data),
+    mutationFn: (payload: { subRating?: number; dubRating?: number }) => ratingsApi.upsert(animeId, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['anime', id] });
-      qc.invalidateQueries({ queryKey: ['rating', id] });
+      queryClient.invalidateQueries({ queryKey: ['anime', animeId] });
+      queryClient.invalidateQueries({ queryKey: ['rating', animeId] });
     },
   });
 
-  if (isLoading) return <DetailSkeleton />;
-  if (!anime) return <div className="text-center py-20" style={{ color: 'var(--text-3)' }}>Anime not found</div>;
+  const postCommentMutation = useMutation({
+    mutationFn: () => commentsApi.create(animeId, { content: commentText }),
+    onSuccess: () => {
+      setCommentText('');
+      queryClient.invalidateQueries({ queryKey: ['comments', animeId] });
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) => commentsApi.delete(animeId, commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', animeId] });
+    },
+  });
+
+  if (animeQuery.isLoading) {
+    return (
+      <main className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
+        <SiteHeader />
+        <div className="max-w-5xl mx-auto px-4 py-10 animate-pulse">
+          <div className="h-10 w-56 rounded mb-4" style={{ background: 'var(--bg-card)' }} />
+          <div className="h-4 w-96 rounded" style={{ background: 'var(--bg-card)' }} />
+        </div>
+      </main>
+    );
+  }
+
+  const anime = animeQuery.data;
+  if (!anime) {
+    return (
+      <main className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
+        <SiteHeader />
+        <div className="max-w-5xl mx-auto px-4 py-10" style={{ color: 'var(--text-3)' }}>
+          Anime not found.
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
-      {/* Back nav */}
-      <div className="max-w-6xl mx-auto px-4 pt-6">
-        <Link href="/" className="text-sm transition-colors" style={{ color: 'var(--text-3)' }}>
-          ← Back to catalog
+      <SiteHeader />
+
+      <section className="max-w-5xl mx-auto px-4 py-8">
+        <Link href="/" className="text-sm" style={{ color: 'var(--text-3)' }}>
+          Back to catalog
         </Link>
-      </div>
 
-      {/* Hero */}
-      <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
-        {/* Cover */}
-        <div className="flex-shrink-0">
-          <div className="relative w-48 h-72 rounded-xl overflow-hidden"
-               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            {anime.coverImageUrl ? (
-              <Image src={anime.coverImageUrl} alt={anime.title} fill className="object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-5xl">⛩</div>
-            )}
+        <div className="mt-6 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+          <div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {anime.genres.map((genre) => (
+                <span
+                  key={genre.id}
+                  className="text-xs px-2 py-1 rounded-full"
+                  style={{ background: 'var(--bg-hover)', color: 'var(--text-2)', border: '1px solid var(--border)' }}
+                >
+                  {genre.name}
+                </span>
+              ))}
+            </div>
+
+            <h1 className="text-4xl font-semibold" style={{ color: 'var(--text-1)' }}>
+              {anime.title}
+            </h1>
+            <p className="text-sm mt-3 max-w-3xl" style={{ color: 'var(--text-2)' }}>
+              {anime.description || 'No description yet.'}
+            </p>
+
+            <div className="grid sm:grid-cols-3 gap-4 mt-8">
+              <StatCard label="Sub Avg" value={anime.avgSubRating ? anime.avgSubRating.toFixed(1) : '-'} />
+              <StatCard label="Dub Avg" value={anime.avgDubRating ? anime.avgDubRating.toFixed(1) : '-'} />
+              <StatCard label="Votes" value={String(anime.totalVotes)} />
+            </div>
+
+            <div className="card p-5 mt-8">
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--text-1)' }}>
+                Rate This Series
+              </h2>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-3)' }}>
+                Use the buttons below to rate the sub and dub separately.
+              </p>
+
+              {user ? (
+                <div className="grid sm:grid-cols-2 gap-4 mt-5">
+                  <RatingPanel
+                    label="Sub"
+                    currentValue={myRatingQuery.data?.subRating ?? null}
+                    onRate={(value) => ratingMutation.mutate({ subRating: value })}
+                  />
+                  {anime.hasDub ? (
+                    <RatingPanel
+                      label="Dub"
+                      currentValue={myRatingQuery.data?.dubRating ?? null}
+                      onRate={(value) => ratingMutation.mutate({ dubRating: value })}
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm mt-5" style={{ color: 'var(--text-3)' }}>
+                  <Link href="/login" style={{ color: 'var(--accent)' }}>
+                    Sign in
+                  </Link>{' '}
+                  to rate this anime.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Info */}
-        <div className="flex-1">
-          <div className="flex flex-wrap gap-2 mb-3">
-            {anime.genres?.map((g: any) => (
-              <span key={g.id} className="text-xs px-2 py-1 rounded-full"
-                    style={{ background: 'var(--bg-hover)', color: 'var(--text-2)', border: '1px solid var(--border)' }}>
-                {g.name}
-              </span>
+          <aside className="card p-5 h-fit">
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-1)' }}>
+              Details
+            </h2>
+            <dl className="mt-4 space-y-3 text-sm">
+              <div>
+                <dt style={{ color: 'var(--text-3)' }}>Status</dt>
+                <dd style={{ color: 'var(--text-1)' }}>{anime.status}</dd>
+              </div>
+              <div>
+                <dt style={{ color: 'var(--text-3)' }}>Year</dt>
+                <dd style={{ color: 'var(--text-1)' }}>{anime.releaseYear ?? '-'}</dd>
+              </div>
+              <div>
+                <dt style={{ color: 'var(--text-3)' }}>Dub Available</dt>
+                <dd style={{ color: 'var(--text-1)' }}>{anime.hasDub ? 'Yes' : 'No'}</dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
+      </section>
+
+      <section className="max-w-5xl mx-auto px-4 pb-12">
+        <div className="card p-5">
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-1)' }}>
+            Discussion
+          </h2>
+
+          {user ? (
+            <div className="mt-4">
+              <textarea
+                className="input resize-none"
+                rows={3}
+                value={commentText}
+                placeholder="Share your thoughts..."
+                onChange={(event) => setCommentText(event.target.value)}
+              />
+              <div className="flex justify-end mt-3">
+                <button
+                  className="btn-primary"
+                  disabled={!commentText.trim() || postCommentMutation.isPending}
+                  onClick={() => postCommentMutation.mutate()}
+                >
+                  {postCommentMutation.isPending ? 'Posting...' : 'Post comment'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm mt-4" style={{ color: 'var(--text-3)' }}>
+              <Link href="/login" style={{ color: 'var(--accent)' }}>
+                Sign in
+              </Link>{' '}
+              to join the discussion.
+            </p>
+          )}
+
+          <div className="mt-6 space-y-4">
+            {commentsQuery.data?.items.map((comment) => (
+              <article key={comment.id} className="card p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>
+                      {comment.user?.username ?? 'Unknown user'}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+                      {new Date(comment.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className="text-xs" style={{ color: 'var(--text-3)' }}>
+                    Score: {comment._count.likes}
+                  </span>
+                </div>
+
+                <p className="text-sm mt-3" style={{ color: 'var(--text-2)' }}>
+                  {comment.content}
+                </p>
+
+                {user?.id === comment.user?.id ? (
+                  <div className="flex justify-end mt-3">
+                    <button
+                      className="text-xs"
+                      style={{ color: '#ef4444' }}
+                      onClick={() => deleteCommentMutation.mutate(comment.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : null}
+
+                {comment.replies.length > 0 ? (
+                  <div className="mt-4 pl-4 border-l space-y-3" style={{ borderColor: 'var(--border)' }}>
+                    {comment.replies.map((reply) => (
+                      <div key={reply.id}>
+                        <p className="text-xs font-medium" style={{ color: 'var(--text-1)' }}>
+                          {reply.user?.username ?? 'Unknown user'}
+                        </p>
+                        <p className="text-sm mt-1" style={{ color: 'var(--text-2)' }}>
+                          {reply.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
             ))}
-            <span className="text-xs px-2 py-1 rounded-full capitalize"
-                  style={{ background: 'var(--bg-hover)', color: 'var(--text-2)', border: '1px solid var(--border)' }}>
-              {anime.status}
-            </span>
-            {anime.hasDub && (
-              <span className="text-xs px-2 py-1 rounded-full font-medium"
-                    style={{ background: 'rgba(224,64,176,0.15)', color: 'var(--accent)', border: '1px solid rgba(224,64,176,0.3)' }}>
-                DUB available
-              </span>
-            )}
           </div>
-
-          <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--text-1)' }}>{anime.title}</h1>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-3)' }}>{anime.releaseYear}</p>
-          <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--text-2)' }}>
-            {anime.description ?? 'No description available.'}
-          </p>
-
-          {/* Sub vs Dub rating comparison */}
-          <RatingComparison
-            anime={anime}
-            myRating={myRating}
-            onRate={(type, value) => ratingMutation.mutate({ [`${type}Rating`]: value })}
-            canRate={!!user}
-          />
         </div>
-      </div>
-
-      {/* Comments */}
-      <div className="max-w-6xl mx-auto px-4 pb-16">
-        <h2 className="text-lg font-semibold mb-6" style={{ color: 'var(--text-1)' }}>
-          Discussion
-        </h2>
-        <CommentsSection animeId={id} user={user} />
-      </div>
+      </section>
     </main>
   );
 }
 
-// ── Rating Comparison Component ───────────────────────────────
-function RatingComparison({ anime, myRating, onRate, canRate }: any) {
+function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card p-5 max-w-lg">
-      <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-2)' }}>
-        COMMUNITY RATINGS — {anime.totalVotes} votes
-      </h3>
-      <div className="grid grid-cols-2 gap-6">
-        <RatingBlock
-          label="Sub"
-          avg={anime.avgSubRating}
-          myScore={myRating?.subRating}
-          canRate={canRate}
-          onRate={(v) => onRate('sub', v)}
-        />
-        {anime.hasDub && (
-          <RatingBlock
-            label="Dub"
-            avg={anime.avgDubRating}
-            myScore={myRating?.dubRating}
-            canRate={canRate}
-            onRate={(v) => onRate('dub', v)}
-          />
-        )}
-      </div>
-      {!canRate && (
-        <p className="text-xs mt-4" style={{ color: 'var(--text-3)' }}>
-          <Link href="/login" style={{ color: 'var(--accent)' }}>Sign in</Link> to rate this anime
-        </p>
-      )}
+    <div className="card p-4">
+      <p className="text-xs uppercase tracking-[0.2em]" style={{ color: 'var(--text-3)' }}>
+        {label}
+      </p>
+      <p className="text-3xl font-semibold mt-2" style={{ color: 'var(--text-1)' }}>
+        {value}
+      </p>
     </div>
   );
 }
 
-function RatingBlock({ label, avg, myScore, canRate, onRate }: any) {
-  const [hover, setHover] = useState(0);
-  const display = hover || myScore || 0;
-
+function RatingPanel({
+  label,
+  currentValue,
+  onRate,
+}: {
+  label: string;
+  currentValue: number | null;
+  onRate: (value: number) => void;
+}) {
   return (
-    <div>
-      <div className="text-xs font-medium mb-2" style={{ color: 'var(--text-3)' }}>{label.toUpperCase()}</div>
-      <div className="text-3xl font-bold mb-1" style={{ color: avg ? '#f59e0b' : 'var(--text-3)' }}>
-        {avg ? Number(avg).toFixed(1) : '—'}
-      </div>
-      {canRate && (
-        <div className="flex gap-1 mt-2">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              className="text-xl transition-transform hover:scale-125"
-              style={{ color: star <= display ? '#f59e0b' : 'var(--text-3)' }}
-              onMouseEnter={() => setHover(star)}
-              onMouseLeave={() => setHover(0)}
-              onClick={() => onRate(star)}
-              title={`Rate ${star}/5`}
-            >
-              ★
-            </button>
-          ))}
-        </div>
-      )}
-      {myScore && (
-        <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>Your rating: {myScore}/5</p>
-      )}
-    </div>
-  );
-}
-
-// ── Comments Section ──────────────────────────────────────────
-function CommentsSection({ animeId, user }: { animeId: string; user: any }) {
-  const qc = useQueryClient();
-  const [newComment, setNewComment] = useState('');
-  const [replyTo, setReplyTo] = useState<string | null>(null);
-
-  const { data, fetchNextPage, hasNextPage } = useQuery({
-    queryKey: ['comments', animeId],
-    queryFn: () => commentsApi.list(animeId, { page: 1, limit: 20 }).then((r) => r.data),
-  });
-
-  const postMutation = useMutation({
-    mutationFn: (content: string) =>
-      commentsApi.create(animeId, { content, parentId: replyTo ?? undefined }),
-    onSuccess: () => {
-      setNewComment('');
-      setReplyTo(null);
-      qc.invalidateQueries({ queryKey: ['comments', animeId] });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (commentId: string) => commentsApi.delete(animeId, commentId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['comments', animeId] }),
-  });
-
-  return (
-    <div>
-      {/* New comment form */}
-      {user ? (
-        <div className="card p-4 mb-6">
-          <textarea
-            className="input resize-none mb-3"
-            rows={3}
-            placeholder={replyTo ? 'Write a reply...' : 'Share your thoughts...'}
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            maxLength={2000}
-          />
-          <div className="flex gap-2 justify-end">
-            {replyTo && (
-              <button className="btn-ghost text-sm" onClick={() => setReplyTo(null)}>
-                Cancel
-              </button>
-            )}
-            <button
-              className="btn-primary text-sm"
-              disabled={!newComment.trim() || postMutation.isPending}
-              onClick={() => postMutation.mutate(newComment.trim())}
-            >
-              {postMutation.isPending ? 'Posting...' : 'Post'}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="card p-4 mb-6 text-sm text-center" style={{ color: 'var(--text-3)' }}>
-          <Link href="/login" style={{ color: 'var(--accent)' }}>Sign in</Link> to join the discussion
-        </div>
-      )}
-
-      {/* Comment list */}
-      <div className="flex flex-col gap-4">
-        {data?.items?.map((comment: any) => (
-          <CommentItem
-            key={comment.id}
-            comment={comment}
-            user={user}
-            animeId={animeId}
-            onReply={() => setReplyTo(comment.id)}
-            onDelete={() => deleteMutation.mutate(comment.id)}
-          />
+    <div className="card p-4">
+      <p className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>
+        {label}
+      </p>
+      <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>
+        Current rating: {currentValue ?? '-'}
+      </p>
+      <div className="flex gap-2 mt-4">
+        {[1, 2, 3, 4, 5].map((value) => (
+          <button
+            key={value}
+            className="w-10 h-10 rounded-lg text-sm font-medium"
+            style={{
+              background: currentValue === value ? 'var(--accent)' : 'var(--bg-hover)',
+              color: currentValue === value ? '#fff' : 'var(--text-2)',
+              border: '1px solid var(--border)',
+            }}
+            onClick={() => onRate(value)}
+          >
+            {value}
+          </button>
         ))}
       </div>
     </div>
-  );
-}
-
-function CommentItem({ comment, user, animeId, onReply, onDelete }: any) {
-  const qc = useQueryClient();
-  const isOwner = user?.id === comment.user?.id;
-
-  const likeMutation = useMutation({
-    mutationFn: (value: 1 | -1) => commentsApi.like(animeId, comment.id, value),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['comments', animeId] }),
-  });
-
-  return (
-    <div className="card p-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>
-          {comment.user?.username}
-        </span>
-        <span className="text-xs" style={{ color: 'var(--text-3)' }}>
-          {new Date(comment.createdAt).toLocaleDateString()}
-        </span>
-      </div>
-      <p className="text-sm mb-3" style={{ color: 'var(--text-2)' }}>{comment.content}</p>
-      <div className="flex items-center gap-3">
-        {user && (
-          <>
-            <button
-              className="text-xs transition-colors"
-              style={{ color: 'var(--text-3)' }}
-              onClick={() => likeMutation.mutate(1)}
-            >
-              ↑ {comment._count?.likes ?? 0}
-            </button>
-            <button
-              className="text-xs transition-colors"
-              style={{ color: 'var(--text-3)' }}
-              onClick={() => likeMutation.mutate(-1)}
-            >
-              ↓
-            </button>
-            <button
-              className="text-xs transition-colors"
-              style={{ color: 'var(--text-3)' }}
-              onClick={onReply}
-            >
-              Reply
-            </button>
-          </>
-        )}
-        {isOwner && (
-          <button
-            className="text-xs ml-auto transition-colors"
-            style={{ color: '#ef4444' }}
-            onClick={onDelete}
-          >
-            Delete
-          </button>
-        )}
-      </div>
-
-      {/* Replies */}
-      {comment.replies?.length > 0 && (
-        <div className="mt-3 pl-4 border-l flex flex-col gap-3" style={{ borderColor: 'var(--border)' }}>
-          {comment.replies.map((reply: any) => (
-            <div key={reply.id}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-medium" style={{ color: 'var(--text-1)' }}>
-                  {reply.user?.username}
-                </span>
-                <span className="text-xs" style={{ color: 'var(--text-3)' }}>
-                  {new Date(reply.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              <p className="text-sm" style={{ color: 'var(--text-2)' }}>{reply.content}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Skeleton ──────────────────────────────────────────────────
-function DetailSkeleton() {
-  return (
-    <main className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
-      <div className="max-w-6xl mx-auto px-4 py-8 flex gap-8 animate-pulse">
-        <div className="w-48 h-72 rounded-xl" style={{ background: 'var(--bg-card)' }} />
-        <div className="flex-1 space-y-4">
-          <div className="h-8 w-64 rounded" style={{ background: 'var(--bg-card)' }} />
-          <div className="h-4 w-96 rounded" style={{ background: 'var(--bg-card)' }} />
-          <div className="h-4 w-80 rounded" style={{ background: 'var(--bg-card)' }} />
-        </div>
-      </div>
-    </main>
   );
 }

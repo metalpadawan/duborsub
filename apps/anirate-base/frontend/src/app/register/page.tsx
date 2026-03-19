@@ -6,13 +6,19 @@ import { useState } from 'react';
 import { AuthLayout } from '@/components/AuthLayout';
 import { useAuthStore } from '@/lib/auth.store';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
+  const register = useAuthStore((state) => state.register);
   const login = useAuthStore((state) => state.login);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [form, setForm] = useState({ username: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const updateField =
+    (field: 'username' | 'email' | 'password') =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setForm((current) => ({ ...current, [field]: event.target.value }));
+    };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -20,17 +26,19 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await register(form.username, form.email, form.password);
+      await login(form.email, form.password);
       router.push('/');
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Invalid credentials');
+      const message = err?.response?.data?.message;
+      setError(Array.isArray(message) ? message.join(', ') : message ?? 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to rate and review anime">
+    <AuthLayout title="Join AniRate" subtitle="Rate anime sub and dub versions">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error ? (
           <div
@@ -47,6 +55,21 @@ export default function LoginPage() {
 
         <div>
           <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-3)' }}>
+            Username
+          </label>
+          <input
+            type="text"
+            className="input"
+            required
+            minLength={3}
+            maxLength={30}
+            value={form.username}
+            onChange={updateField('username')}
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-3)' }}>
             Email
           </label>
           <input
@@ -54,8 +77,8 @@ export default function LoginPage() {
             className="input"
             required
             autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            value={form.email}
+            onChange={updateField('email')}
           />
         </div>
 
@@ -67,25 +90,24 @@ export default function LoginPage() {
             type="password"
             className="input"
             required
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            minLength={8}
+            autoComplete="new-password"
+            value={form.password}
+            onChange={updateField('password')}
           />
-          <div className="text-right mt-1">
-            <Link href="/forgot-password" className="text-xs" style={{ color: 'var(--text-3)' }}>
-              Forgot password?
-            </Link>
-          </div>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>
+            Min 8 chars, uppercase, number, and special character.
+          </p>
         </div>
 
         <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign in'}
+          {loading ? 'Creating account...' : 'Create account'}
         </button>
 
         <p className="text-center text-sm" style={{ color: 'var(--text-3)' }}>
-          No account?{' '}
-          <Link href="/register" style={{ color: 'var(--accent)' }}>
-            Create one
+          Already have an account?{' '}
+          <Link href="/login" style={{ color: 'var(--accent)' }}>
+            Sign in
           </Link>
         </p>
       </form>

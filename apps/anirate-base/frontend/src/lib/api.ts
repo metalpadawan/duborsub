@@ -1,82 +1,81 @@
-// src/lib/api.ts
-// Axios instance with:
-//   - auto-attach Authorization header
-//   - silent token refresh on 401
-//   - request deduplication during refresh
-
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
 
-// ── Token store (in-memory only — never localStorage) ────────
+type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
 let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 
 export const tokenStore = {
   get: () => accessToken,
-  set: (t: string | null) => { accessToken = t; },
-  clear: () => { accessToken = null; },
+  set: (token: string | null) => {
+    accessToken = token;
+  },
+  clear: () => {
+    accessToken = null;
+  },
 };
 
-// ── Axios instance ────────────────────────────────────────────
 export const api: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  withCredentials: true, // sends httpOnly refresh cookie
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
   timeout: 10_000,
 });
 
-// ── Request interceptor: attach access token ─────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = tokenStore.get();
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    const headers = config.headers as any;
+    headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// ── Response interceptor: handle 401 with token refresh ──────
 api.interceptors.response.use(
-  (res) => res,
+  (response) => response,
   async (error) => {
-    const original = error.config;
-
-    if (error.response?.status !== 401 || original._retry) {
+    const original = error.config as RetryableConfig | undefined;
+    if (!original || error.response?.status !== 401 || original._retry) {
       return Promise.reject(error);
     }
 
     original._retry = true;
 
-    // Deduplicate concurrent refresh calls
     if (!refreshPromise) {
       refreshPromise = api
         .post<{ accessToken: string }>('/auth/refresh')
-        .then((r) => {
-          tokenStore.set(r.data.accessToken);
-          return r.data.accessToken;
+        .then((response) => {
+          tokenStore.set(response.data.accessToken);
+          return response.data.accessToken;
         })
         .catch(() => {
           tokenStore.clear();
-          // Redirect to login if refresh fails
-          if (typeof window !== 'undefined') window.location.href = '/login';
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
           return null;
         })
-        .finally(() => { refreshPromise = null; });
+        .finally(() => {
+          refreshPromise = null;
+        });
     }
 
     const newToken = await refreshPromise;
-    if (!newToken) return Promise.reject(error);
+    if (!newToken) {
+      return Promise.reject(error);
+    }
 
-    original.headers.Authorization = `Bearer ${newToken}`;
+    const headers = original.headers as any;
+    headers.Authorization = `Bearer ${newToken}`;
     return api(original);
   },
 );
 
-// ── Typed endpoint helpers ────────────────────────────────────
 export const authApi = {
   register: (data: RegisterPayload) => api.post('/auth/register', data),
-  login: (data: LoginPayload) =>
-    api.post<{ user: User; accessToken: string }>('/auth/login', data),
+  login: (data: LoginPayload) => api.post<{ user: User; accessToken: string }>('/auth/login', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get<User>('/auth/me'),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
@@ -95,14 +94,14 @@ export const animeApi = {
 export const ratingsApi = {
   upsert: (animeId: string, data: { subRating?: number; dubRating?: number }) =>
     api.post(`/anime/${animeId}/ratings`, data),
-  mine: (animeId: string) => api.get(`/anime/${animeId}/ratings/me`),
+  mine: (animeId: string) => api.get('/anime/' + animeId + '/ratings/me'),
   remove: (animeId: string) => api.delete(`/anime/${animeId}/ratings`),
   distribution: (animeId: string) => api.get(`/anime/${animeId}/ratings/distribution`),
 };
 
 export const commentsApi = {
   list: (animeId: string, params?: { page?: number; limit?: number }) =>
-    api.get(`/anime/${animeId}/comments`, { params }),
+    api.get<CommentListResponse>(`/anime/${animeId}/comments`, { params }),
   create: (animeId: string, data: { content: string; parentId?: string }) =>
     api.post(`/anime/${animeId}/comments`, data),
   update: (animeId: string, commentId: string, content: string) =>
@@ -115,27 +114,101 @@ export const commentsApi = {
     api.delete(`/anime/${animeId}/comments/${commentId}/like`),
 };
 
-// ── Types ─────────────────────────────────────────────────────
 export interface User {
-  id: string; username: string; email: string; role: 'user' | 'admin';
+  id: string;
+  username: string;
+  email: string;
+  role: 'user' | 'admin';
 }
-export interface RegisterPayload { username: string; email: string; password: string; }
-export interface LoginPayload { email: string; password: string; }
+
+export interface RegisterPayload {
+  username: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface Genre {
+  id: number;
+  name: string;
+}
+
 export interface Anime {
-  id: string; title: string; coverImageUrl?: string; releaseYear?: number;
-  status: string; hasDub: boolean; avgSubRating?: number; avgDubRating?: number;
-  totalVotes: number; genres: { id: number; name: string }[];
+  id: string;
+  title: string;
+  coverImageUrl?: string | null;
+  releaseYear?: number | null;
+  status: string;
+  hasDub: boolean;
+  avgSubRating?: number | null;
+  avgDubRating?: number | null;
+  totalVotes: number;
+  genres: Genre[];
 }
-export interface AnimeDetail extends Anime { description?: string; }
+
+export interface AnimeDetail extends Anime {
+  description?: string;
+}
+
 export interface PaginatedAnime {
   items: Anime[];
-  pagination: { page: number; limit: number; total: number; pages: number };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
 }
+
 export interface AnimeQuery {
-  search?: string; status?: string; year?: number; genreId?: number;
-  sortBy?: string; order?: string; page?: number; limit?: number;
+  search?: string;
+  status?: string;
+  year?: number;
+  genreId?: number;
+  sortBy?: string;
+  order?: string;
+  page?: number;
+  limit?: number;
 }
+
 export interface CreateAnimePayload {
-  title: string; description?: string; coverImageUrl?: string; releaseYear?: number;
-  hasDub?: boolean; status?: string; genreIds?: number[];
+  title: string;
+  description?: string;
+  coverImageUrl?: string;
+  releaseYear?: number;
+  hasDub?: boolean;
+  status?: string;
+  genreIds?: number[];
+}
+
+export interface CommentItem {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  user: { id: string; username: string } | null;
+  replies: Array<{
+    id: string;
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+    user: { id: string; username: string } | null;
+  }>;
+  _count: {
+    likes: number;
+  };
+}
+
+export interface CommentListResponse {
+  items: CommentItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
 }
