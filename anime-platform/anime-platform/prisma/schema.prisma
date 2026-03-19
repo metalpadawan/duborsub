@@ -1,0 +1,200 @@
+// ============================================================
+// Prisma Schema — Anime Rating Platform
+// Provider: PostgreSQL
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  user
+  admin
+}
+
+enum AnimeStatus {
+  airing
+  completed
+  upcoming
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model User {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username             String    @unique @db.Citext
+  email                String    @unique @db.Citext
+  passwordHash         String    @map("password_hash")
+  role                 UserRole  @default(user)
+
+  isBanned             Boolean   @default(false) @map("is_banned")
+  banReason            String?   @map("ban_reason")
+  bannedUntil          DateTime? @map("banned_until") @db.Timestamptz()
+
+  failedLoginAttempts  Int       @default(0) @map("failed_login_attempts") @db.SmallInt
+  lockedUntil          DateTime? @map("locked_until") @db.Timestamptz()
+  lastLoginAt          DateTime? @map("last_login_at") @db.Timestamptz()
+
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  ratings              Rating[]
+  comments             Comment[]
+  commentLikes         CommentLike[]
+  passwordResetTokens  PasswordResetToken[]
+  refreshTokens        RefreshToken[]
+  adminLogs            AdminLog[]
+
+  @@map("users")
+}
+
+model Anime {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title          String      @db.VarChar(255)
+  description    String?     @db.Text
+  coverImageUrl  String?     @map("cover_image_url")
+  releaseYear    Int?        @map("release_year") @db.SmallInt
+  hasDub         Boolean     @default(false) @map("has_dub")
+  status         AnimeStatus @default(completed)
+
+  avgSubRating   Decimal?    @map("avg_sub_rating") @db.Decimal(3, 2)
+  avgDubRating   Decimal?    @map("avg_dub_rating") @db.Decimal(3, 2)
+  totalVotes     Int         @default(0) @map("total_votes")
+
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  ratings        Rating[]
+  comments       Comment[]
+  animeGenres    AnimeGenre[]
+
+  @@map("anime")
+}
+
+model Genre {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique @db.VarChar(50)
+  animeGenres AnimeGenre[]
+
+  @@map("genres")
+}
+
+model AnimeGenre {
+  animeId  String @map("anime_id") @db.Uuid
+  genreId  Int    @map("genre_id")
+
+  anime    Anime  @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  genre    Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([animeId, genreId])
+  @@map("anime_genres")
+}
+
+model Rating {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  animeId    String    @map("anime_id") @db.Uuid
+
+  subRating  Int?      @map("sub_rating") @db.SmallInt
+  dubRating  Int?      @map("dub_rating") @db.SmallInt
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime      Anime     @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@map("ratings")
+}
+
+model Comment {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  animeId    String    @map("anime_id") @db.Uuid
+  parentId   String?   @map("parent_id") @db.Uuid
+
+  content    String    @db.Text
+  isDeleted  Boolean   @default(false) @map("is_deleted")
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime      Anime     @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  parent     Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies    Comment[] @relation("CommentReplies")
+  likes      CommentLike[]
+
+  @@map("comments")
+}
+
+model CommentLike {
+  commentId  String    @map("comment_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  value      Int       @db.SmallInt   // 1 = like, -1 = dislike
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  comment    Comment   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@map("comment_likes")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz()
+  usedAt     DateTime? @map("used_at") @db.Timestamptz()
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model RefreshToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  ipAddress  String?   @map("ip_address")
+  userAgent  String?   @map("user_agent")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz()
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz()
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model AdminLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId     String   @map("admin_id") @db.Uuid
+  action      String   @db.VarChar(64)
+  targetType  String?  @map("target_type") @db.VarChar(32)
+  targetId    String?  @map("target_id") @db.Uuid
+  metadata    Json?
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  admin       User     @relation(fields: [adminId], references: [id])
+
+  @@map("admin_logs")
+}

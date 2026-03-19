@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-base:    #0a0a0f;
+    --bg-surface: #111118;
+    --bg-card:    #16161e;
+    --bg-hover:   #1e1e28;
+    --accent:     #e040b0;
+    --accent-alt: #7c3aed;
+    --text-1:     #f0eff6;
+    --text-2:     #a8a4b8;
+    --text-3:     #6b6780;
+    --border:     rgba(255,255,255,0.07);
+    --radius-sm:  6px;
+    --radius:     10px;
+    --radius-lg:  16px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-1);
+    font-family: 'Inter var', 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: rgba(224, 64, 176, 0.3);
+    color: var(--text-1);
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-base); }
+  ::-webkit-scrollbar-thumb {
+    background: var(--text-3);
+    border-radius: 3px;
+  }
+}
+
+@layer components {
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all;
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:active { transform: scale(0.98); }
+
+  .btn-ghost {
+    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all;
+    color: var(--text-2);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover {
+    background: var(--bg-hover);
+    color: var(--text-1);
+  }
+
+  .input {
+    @apply w-full px-3 py-2 rounded-lg text-sm outline-none transition-all;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-1);
+  }
+  .input:focus { border-color: var(--accent); }
+  .input::placeholder { color: var(--text-3); }
+
+  .rating-star {
+    @apply text-xl cursor-pointer transition-transform;
+    color: var(--text-3);
+  }
+  .rating-star.filled { color: #f59e0b; }
+  .rating-star:hover { transform: scale(1.2); color: #f59e0b; }
+}

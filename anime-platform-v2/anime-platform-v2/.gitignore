@@ -1,0 +1,10 @@
+# .gitignore (root)
+node_modules/
+dist/
+.next/
+.env
+.env.local
+.env.production
+*.log
+coverage/
+.DS_Store
