@@ -1,3 +1,5 @@
+// These DTOs document and validate every auth payload that enters the API.
+// Keeping them together makes it easy to see the shape of the full auth surface.
 import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class RegisterDto {

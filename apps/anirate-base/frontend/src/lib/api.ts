@@ -1,3 +1,5 @@
+// This file centralizes frontend API access.
+// It also owns access-token memory storage and automatic refresh retry behavior.
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
@@ -27,6 +29,7 @@ export const api: AxiosInstance = axios.create({
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = tokenStore.get();
   if (token) {
+    // Authorization is attached lazily so public requests stay clean.
     const headers = config.headers as any;
     headers.Authorization = `Bearer ${token}`;
   }
@@ -44,6 +47,7 @@ api.interceptors.response.use(
     original._retry = true;
 
     if (!refreshPromise) {
+      // Concurrent 401s should wait on one refresh request instead of stampeding the API.
       refreshPromise = api
         .post<{ accessToken: string }>('/auth/refresh')
         .then((response) => {

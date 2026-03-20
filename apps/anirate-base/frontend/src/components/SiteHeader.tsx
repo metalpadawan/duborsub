@@ -1,5 +1,7 @@
 'use client';
 
+// SiteHeader is shared across the main catalog and detail views.
+// It reflects auth state and gives users a reliable way back to the home page.
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth.store';
@@ -9,6 +11,7 @@ export function SiteHeader() {
   const { user, logout } = useAuthStore();
 
   const handleLogout = async () => {
+    // After logout we redirect home so the UI resets to a predictable public state.
     await logout();
     router.push('/');
   };

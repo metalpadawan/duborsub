@@ -1,3 +1,4 @@
+// The admin module depends on comments so moderators can reuse comment deletion behavior.
 import { Module } from '@nestjs/common';
 import { CommentsModule } from '../comments/comments.module';
 import { AdminController } from './admin.controller';

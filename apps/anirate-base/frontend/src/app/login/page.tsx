@@ -1,5 +1,7 @@
 'use client';
 
+// LoginPage is intentionally small: submit credentials, surface backend errors,
+// then hand navigation back to the catalog after a successful sign-in.
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -21,6 +23,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
+      // We redirect after the store is populated so the header renders the signed-in state immediately.
       router.push('/');
     } catch (err: any) {
       setError(err?.response?.data?.message ?? 'Invalid credentials');

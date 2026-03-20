@@ -1,3 +1,4 @@
+// Admin DTOs capture the lightweight moderation and list-query payloads used in the demo.
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 

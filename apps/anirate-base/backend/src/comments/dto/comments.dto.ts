@@ -1,3 +1,4 @@
+// Comment DTOs describe create, edit, vote, and pagination payloads for discussions.
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 

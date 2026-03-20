@@ -1,3 +1,5 @@
+// AnimeService centralizes catalog reads and admin mutations for anime records.
+// It also enriches raw anime records with derived rating statistics for the UI.
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataService } from '../data/data.service';
@@ -8,6 +10,7 @@ export class AnimeService {
   constructor(private readonly data: DataService) {}
 
   findAll(query: AnimeQueryDto) {
+    // Build the list in memory, then apply filters, sorting, and pagination in a predictable order.
     const {
       search,
       status,
@@ -82,6 +85,7 @@ export class AnimeService {
   }
 
   create(dto: CreateAnimeDto) {
+    // Admin creation writes a new raw record first, then returns the enriched view shape.
     const now = new Date();
     const anime = {
       id: randomUUID(),
@@ -101,6 +105,7 @@ export class AnimeService {
   }
 
   update(id: string, dto: UpdateAnimeDto) {
+    // Partial updates only touch fields present in the payload.
     const anime = this.data.findAnimeById(id);
     if (!anime) {
       throw new NotFoundException('Anime not found');
@@ -119,6 +124,7 @@ export class AnimeService {
   }
 
   remove(id: string) {
+    // Removing an anime also clears dependent ratings so derived stats stay coherent.
     const index = this.data.anime.findIndex((anime) => anime.id === id);
     if (index === -1) {
       throw new NotFoundException('Anime not found');
@@ -136,6 +142,7 @@ export class AnimeService {
   }
 
   private enrichAnime(id: string) {
+    // The frontend expects derived stats on the anime object, so we compute them here once.
     const anime = this.data.findAnimeById(id);
     if (!anime) {
       throw new NotFoundException('Anime not found');

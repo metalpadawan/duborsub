@@ -1,3 +1,8 @@
+/*
+  Global design tokens and shared utility classes for the AniRate frontend.
+  The goal is to keep colors, spacing, and common interactive styles consistent
+  across pages without repeating large inline style blocks.
+*/
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

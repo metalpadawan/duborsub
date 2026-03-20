@@ -1,3 +1,5 @@
+// RatingsService manages per-user score state and the simple distribution view
+// that powers the anime detail page.
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataService } from '../data/data.service';
@@ -8,6 +10,7 @@ export class RatingsService {
   constructor(private readonly data: DataService) {}
 
   upsert(userId: string, animeId: string, dto: UpsertRatingDto) {
+    // A single user can keep one rating record per anime and update it over time.
     if (dto.subRating === undefined && dto.dubRating === undefined) {
       throw new BadRequestException('Provide at least one rating');
     }
@@ -56,6 +59,7 @@ export class RatingsService {
   }
 
   getDistribution(animeId: string) {
+    // The detail page only needs simple 1-5 bucket counts, so we keep the shape compact.
     const anime = this.data.findAnimeById(animeId);
     if (!anime) {
       throw new NotFoundException('Anime not found');

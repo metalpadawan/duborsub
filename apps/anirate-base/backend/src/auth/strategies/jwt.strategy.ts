@@ -1,3 +1,5 @@
+// JwtStrategy is the bridge between signed access tokens and the user object
+// that controllers receive through req.user.
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';

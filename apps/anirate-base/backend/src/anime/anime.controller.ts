@@ -1,3 +1,4 @@
+// AnimeController exposes the public catalog endpoints plus admin-only write routes.
 import {
   Body,
   Controller,

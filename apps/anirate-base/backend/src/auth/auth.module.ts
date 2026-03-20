@@ -1,3 +1,5 @@
+// The auth module bundles controllers, services, and Passport/JWT integration.
+// It is intentionally self-contained because every other protected module depends on it.
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';

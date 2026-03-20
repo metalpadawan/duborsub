@@ -1,6 +1,6 @@
-// src/lib/auth.store.ts
-// Zustand auth store — persists user info in memory,
-// access token in memory, refresh token in httpOnly cookie
+// This store keeps the frontend's authentication state in one place.
+// The access token only lives in memory, while the refresh token stays in
+// the browser cookie managed by the backend.
 
 import { create } from 'zustand';
 import { authApi, tokenStore, User } from './api';
@@ -32,6 +32,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+    // Logout should clear local state even if the server cookie is already gone.
     await authApi.logout().catch(() => null);
     tokenStore.clear();
     set({ user: null, isAuthenticated: false });
@@ -40,15 +41,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   loadUser: async () => {
     set({ isLoading: true });
     try {
-      // Try to get a fresh access token via the refresh cookie
+      // On a hard refresh we no longer have the in-memory access token, so we
+      // first ask the backend to rotate the refresh cookie into a new token.
       const { data: refreshData } = await import('./api').then((m) =>
         m.api.post<{ accessToken: string }>('/auth/refresh'),
       );
       tokenStore.set(refreshData.accessToken);
 
+      // Once a fresh token exists, we can safely ask for the current user.
       const { data: user } = await authApi.me();
       set({ user, isAuthenticated: true });
     } catch {
+      // Any refresh or profile failure means we should treat the session as signed out.
       tokenStore.clear();
       set({ user: null, isAuthenticated: false });
     } finally {

@@ -1,5 +1,7 @@
 'use client';
 
+// ForgotPasswordPage mirrors a production reset request flow, but the local
+// in-memory backend exposes a debug token so the feature can still be tested.
 import Link from 'next/link';
 import { useState } from 'react';
 import { AuthLayout } from '@/components/AuthLayout';
@@ -20,6 +22,7 @@ export default function ForgotPasswordPage() {
     try {
       const response = await authApi.forgotPassword(email);
       const token = response.data?.debugToken;
+      // In local development we show the token directly because no SMTP service is configured.
       setMessage(
         token
           ? `Reset token for local testing: ${token}`

@@ -1,3 +1,6 @@
+// AuthService owns account creation, login, refresh rotation, and password reset.
+// In the current runnable build it persists state in memory, but the API shape mirrors
+// what a database-backed service would look like.
 import {
   BadRequestException,
   ConflictException,
@@ -31,6 +34,7 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    // Registration keeps uniqueness rules in one place so the controller stays thin.
     const emailExists = this.data.findUserByEmail(dto.email);
     const usernameExists = this.data.findUserByUsername(dto.username);
 
@@ -61,6 +65,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ipAddress: string, userAgent: string) {
+    // Login is where lockout rules, ban checks, and session creation all converge.
     const user = this.data.findUserByEmail(dto.email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -100,6 +105,7 @@ export class AuthService {
   }
 
   async refresh(rawToken: string, ipAddress: string, userAgent: string) {
+    // Refresh tokens are rotated every time to reduce the value of a leaked token.
     if (!rawToken) {
       throw new UnauthorizedException('No refresh token');
     }
@@ -124,6 +130,7 @@ export class AuthService {
   }
 
   async logout(rawToken: string | undefined) {
+    // Logout is intentionally tolerant because clients may already have lost the cookie.
     if (!rawToken) {
       return;
     }
@@ -136,6 +143,7 @@ export class AuthService {
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
+    // The response text stays generic so this endpoint cannot be used to enumerate accounts.
     const user = this.data.findUserByEmail(dto.email);
     if (!user) {
       return { message: 'If that email exists, a reset link has been sent' };
@@ -165,6 +173,7 @@ export class AuthService {
   }
 
   async resetPassword(dto: ResetPasswordDto) {
+    // Password reset also revokes active refresh sessions to force a clean re-login.
     const tokenHash = this.hashToken(dto.token);
     const record = this.data.passwordResetTokens.find((entry) => entry.tokenHash === tokenHash) ?? null;
 
@@ -201,6 +210,7 @@ export class AuthService {
   }
 
   private async signAccessToken(user: UserRecord) {
+    // Access tokens stay short-lived and simple; refresh rotation handles continuity.
     return this.jwt.signAsync(
       { sub: user.id, role: user.role },
       { expiresIn: `${ACCESS_TOKEN_MINUTES}m` },
@@ -208,6 +218,7 @@ export class AuthService {
   }
 
   private issueRefreshToken(userId: string, ipAddress: string, userAgent: string) {
+    // Only a hash is stored so a raw refresh token never lives in application state.
     const rawToken = randomBytes(40).toString('hex');
     const record: RefreshTokenRecord = {
       id: randomUUID(),
@@ -229,6 +240,7 @@ export class AuthService {
   }
 
   private toPublicUser(user: UserRecord) {
+    // Controllers only return safe fields that the frontend actually needs.
     return {
       id: user.id,
       username: user.username,

@@ -1,3 +1,4 @@
+// AdminService provides moderation actions plus simple aggregate views for dashboard pages.
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CommentsService } from '../comments/comments.service';
@@ -12,6 +13,7 @@ export class AdminService {
   ) {}
 
   getDashboardStats() {
+    // The dashboard stays intentionally simple: totals, a small top list, and recent admin events.
     return {
       counts: {
         totalUsers: this.data.users.length,
@@ -61,6 +63,7 @@ export class AdminService {
   }
 
   banUser(adminId: string, userId: string, dto: BanUserDto, ipAddress: string) {
+    // Moderation actions always write an audit log entry so the admin UI has activity history.
     const user = this.data.findUserById(userId);
     if (!user) {
       throw new NotFoundException('User not found');

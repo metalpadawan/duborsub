@@ -1,3 +1,5 @@
+// This controller gives the API root a friendly landing response.
+// It is mainly for humans verifying that the backend is alive.
 import { Controller, Get } from '@nestjs/common';
 
 @Controller()

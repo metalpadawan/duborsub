@@ -1,3 +1,4 @@
+// RatingsController hangs rating routes under a specific anime resource.
 import {
   Body,
   Controller,

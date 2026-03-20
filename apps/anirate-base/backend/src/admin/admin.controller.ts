@@ -1,3 +1,4 @@
+// AdminController exposes moderation and analytics routes for authenticated admins.
 import {
   Body,
   Controller,

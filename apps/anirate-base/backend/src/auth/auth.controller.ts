@@ -1,3 +1,5 @@
+// AuthController translates HTTP requests into auth service calls and handles
+// the refresh cookie lifecycle that the browser depends on.
 import {
   Body,
   Controller,

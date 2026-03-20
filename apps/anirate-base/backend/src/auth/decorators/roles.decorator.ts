@@ -1,3 +1,4 @@
+// Roles stores required role metadata on handlers so RolesGuard can enforce it later.
 import { SetMetadata } from '@nestjs/common';
 
 export const ROLES_KEY = 'roles';

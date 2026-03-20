@@ -1,3 +1,4 @@
+// AuthLayout gives all auth pages a consistent centered shell and branding.
 import Link from 'next/link';
 
 export function AuthLayout({

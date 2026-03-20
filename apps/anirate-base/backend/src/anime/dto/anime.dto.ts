@@ -1,3 +1,4 @@
+// The anime DTOs define the catalog payloads and query parameters used by the UI.
 import { Type } from 'class-transformer';
 import {
   IsArray,

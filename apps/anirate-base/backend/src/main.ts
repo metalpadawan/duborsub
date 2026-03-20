@@ -1,3 +1,5 @@
+// Application bootstrap configures shared HTTP concerns once:
+// security headers, cookies, CORS, validation, and the versioned API prefix.
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';

@@ -1,5 +1,7 @@
 'use client';
 
+// The catalog page is the main landing page for the app.
+// It keeps filtering local to the UI while React Query handles server fetching.
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -16,6 +18,8 @@ export default function CatalogPage() {
   const [page, setPage] = useState(1);
 
   const query = useQuery({
+    // Every filter value participates in the cache key so pagination and searches
+    // stay in sync without us manually tracking stale results.
     queryKey: ['anime', search, sort, genre, page],
     queryFn: async () => {
       const response = await animeApi.list({ search, sortBy: sort, page, limit: 24 });
@@ -23,6 +27,7 @@ export default function CatalogPage() {
     },
   });
 
+  // Genre filtering is lightweight enough to keep client-side for the seeded demo data.
   const filteredItems = query.data?.items.filter((anime) =>
     genre ? anime.genres.some((entry) => entry.name === genre) : true,
   );
@@ -93,6 +98,7 @@ export default function CatalogPage() {
 
       <section className="max-w-7xl mx-auto px-4 py-8">
         {query.isLoading ? (
+          // Skeleton cards keep the grid stable while the first catalog request resolves.
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Array.from({ length: 12 }).map((_, index) => (
               <div key={index} className="animate-pulse">
@@ -117,6 +123,8 @@ export default function CatalogPage() {
             ) : null}
 
             {query.data && query.data.pagination.pages > 1 ? (
+              // Pagination is driven by API metadata so the UI adapts automatically
+              // if the page size or seed data changes later.
               <div className="flex justify-center gap-2 mt-10">
                 {Array.from({ length: query.data.pagination.pages }, (_, index) => index + 1).map((value) => (
                   <button
@@ -167,6 +175,7 @@ function AnimeCard({ anime }: { anime: Anime }) {
             className="absolute top-2 right-2 text-xs font-bold px-1.5 py-0.5 rounded"
             style={{ background: 'rgba(0,0,0,0.75)', color: '#f59e0b' }}
           >
+            {/* The seeded UI uses a simple text marker instead of a custom icon set. */}
             * {Number(anime.avgSubRating).toFixed(1)}
           </div>
         ) : null}

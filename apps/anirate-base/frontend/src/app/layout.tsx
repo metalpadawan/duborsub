@@ -1,3 +1,4 @@
+// RootLayout is the one place where every page gets global CSS and client providers.
 import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';

@@ -1,5 +1,7 @@
 'use client';
 
+// The detail page combines the three main interactive surfaces of the app:
+// anime metadata, personal ratings, and the discussion thread.
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -16,6 +18,7 @@ export default function AnimeDetailPage() {
   const [commentText, setCommentText] = useState('');
 
   const animeQuery = useQuery({
+    // The page is anchored around the anime payload, so this query owns the primary loading state.
     queryKey: ['anime', animeId],
     queryFn: async () => {
       const response = await animeApi.get(animeId);
@@ -24,6 +27,7 @@ export default function AnimeDetailPage() {
   });
 
   const myRatingQuery = useQuery({
+    // Personal rating data is only relevant when someone is signed in.
     queryKey: ['rating', animeId],
     queryFn: async () => {
       const response = await ratingsApi.mine(animeId);
@@ -43,6 +47,7 @@ export default function AnimeDetailPage() {
   const ratingMutation = useMutation({
     mutationFn: (payload: { subRating?: number; dubRating?: number }) => ratingsApi.upsert(animeId, payload),
     onSuccess: () => {
+      // Revalidate both the anime aggregate view and the user's personal rating badge.
       queryClient.invalidateQueries({ queryKey: ['anime', animeId] });
       queryClient.invalidateQueries({ queryKey: ['rating', animeId] });
     },
@@ -52,6 +57,7 @@ export default function AnimeDetailPage() {
     mutationFn: () => commentsApi.create(animeId, { content: commentText }),
     onSuccess: () => {
       setCommentText('');
+      // Refresh the thread after posting so the new comment appears in chronological context.
       queryClient.invalidateQueries({ queryKey: ['comments', animeId] });
     },
   });
@@ -67,6 +73,7 @@ export default function AnimeDetailPage() {
     return (
       <main className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
         <SiteHeader />
+        {/* Keep the layout shell visible during loading so the route change feels stable. */}
         <div className="max-w-5xl mx-auto px-4 py-10 animate-pulse">
           <div className="h-10 w-56 rounded mb-4" style={{ background: 'var(--bg-card)' }} />
           <div className="h-4 w-96 rounded" style={{ background: 'var(--bg-card)' }} />
@@ -132,6 +139,7 @@ export default function AnimeDetailPage() {
               </p>
 
               {user ? (
+                // Ratings stay split so sub and dub opinions can diverge naturally.
                 <div className="grid sm:grid-cols-2 gap-4 mt-5">
                   <RatingPanel
                     label="Sub"
@@ -247,6 +255,7 @@ export default function AnimeDetailPage() {
                 ) : null}
 
                 {comment.replies.length > 0 ? (
+                  // Replies are already nested by the API, so the UI only needs a lightweight indent.
                   <div className="mt-4 pl-4 border-l space-y-3" style={{ borderColor: 'var(--border)' }}>
                     {comment.replies.map((reply) => (
                       <div key={reply.id}>
@@ -299,6 +308,7 @@ function RatingPanel({
       <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>
         Current rating: {currentValue ?? '-'}
       </p>
+      {/* The selected value is highlighted so a returning user can see their current vote at a glance. */}
       <div className="flex gap-2 mt-4">
         {[1, 2, 3, 4, 5].map((value) => (
           <button

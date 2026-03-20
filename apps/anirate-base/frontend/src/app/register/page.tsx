@@ -1,5 +1,7 @@
 'use client';
 
+// RegisterPage creates an account and then signs the new user in so the flow
+// feels like a single action instead of two disconnected steps.
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -14,6 +16,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // A small field updater keeps the JSX inputs readable without repeating state merge logic.
   const updateField =
     (field: 'username' | 'email' | 'password') =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,6 +30,8 @@ export default function RegisterPage() {
 
     try {
       await register(form.username, form.email, form.password);
+      // The backend returns registration success but not an access token, so we
+      // immediately log the user in with the same credentials.
       await login(form.email, form.password);
       router.push('/');
     } catch (err: any) {

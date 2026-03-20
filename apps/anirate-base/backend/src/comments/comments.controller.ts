@@ -1,3 +1,4 @@
+// CommentsController exposes discussion endpoints nested beneath each anime.
 import {
   Body,
   Controller,

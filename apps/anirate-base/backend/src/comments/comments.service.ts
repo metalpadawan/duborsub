@@ -1,3 +1,4 @@
+// CommentsService manages threaded discussion state, ownership checks, and vote totals.
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataService } from '../data/data.service';
@@ -13,6 +14,7 @@ export class CommentsService {
   constructor(private readonly data: DataService) {}
 
   list(animeId: string, query: CommentsQueryDto) {
+    // We paginate top-level comments and always include their replies inline for convenience.
     const anime = this.data.findAnimeById(animeId);
     if (!anime) {
       throw new NotFoundException('Anime not found');
@@ -39,6 +41,7 @@ export class CommentsService {
   }
 
   create(userId: string, animeId: string, dto: CreateCommentDto) {
+    // Replies are just comments with parentId set, which keeps the model lightweight.
     const anime = this.data.findAnimeById(animeId);
     if (!anime) {
       throw new NotFoundException('Anime not found');
@@ -83,6 +86,7 @@ export class CommentsService {
   }
 
   vote(userId: string, commentId: string, dto: VoteCommentDto) {
+    // Voting is an upsert so repeated likes/dislikes simply overwrite the prior choice.
     this.findComment(commentId);
     const existing = this.data.commentLikes.find(
       (like) => like.commentId === commentId && like.userId === userId,
@@ -120,6 +124,7 @@ export class CommentsService {
   }
 
   private serializeComment(commentId: string) {
+    // Serialization gathers the user, replies, and score so the frontend needs one request only.
     const comment = this.findComment(commentId);
     const user = this.data.findUserById(comment.userId);
     const replies = this.data.comments

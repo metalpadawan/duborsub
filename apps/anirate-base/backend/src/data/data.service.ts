@@ -1,3 +1,6 @@
+// DataService is a lightweight replacement for the missing persistent database layer.
+// It seeds realistic sample users, anime, ratings, comments, and admin logs so the
+// frontend and API can be explored immediately without any external setup.
 import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
@@ -100,6 +103,7 @@ export interface AdminLogRecord {
 
 @Injectable()
 export class DataService {
+  // These arrays act as the current persistence boundary for the demo runtime.
   readonly users: UserRecord[] = [];
   readonly anime: AnimeRecord[] = [];
   readonly ratings: RatingRecord[] = [];
@@ -114,6 +118,7 @@ export class DataService {
   }
 
   findUserByEmail(email: string) {
+    // Email lookup is case-insensitive because login forms usually are too.
     return this.users.find((user) => user.email.toLowerCase() === email.toLowerCase()) ?? null;
   }
 
@@ -134,6 +139,7 @@ export class DataService {
       return;
     }
 
+    // Seed just enough realistic data to make every page feel populated on first boot.
     const now = new Date();
     const adminId = randomUUID();
     const demoId = randomUUID();
@@ -279,6 +285,7 @@ export class DataService {
       },
     );
 
+    // Ratings intentionally cover mixed sub/dub cases so the detail page can compare both.
     this.ratings.push(
       {
         id: randomUUID(),
@@ -327,6 +334,7 @@ export class DataService {
       },
     );
 
+    // A small threaded comment sample is enough to exercise nesting and moderation paths.
     const firstCommentId = randomUUID();
     this.comments.push(
       {

@@ -1,3 +1,4 @@
+// RolesGuard reads role metadata from the route and compares it with the authenticated user.
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';

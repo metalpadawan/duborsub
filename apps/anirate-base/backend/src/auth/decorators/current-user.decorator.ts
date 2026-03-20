@@ -1,3 +1,4 @@
+// CurrentUser keeps controller signatures clean by reading req.user in one place.
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 export const CurrentUser = createParamDecorator((_data: unknown, ctx: ExecutionContext) => {
