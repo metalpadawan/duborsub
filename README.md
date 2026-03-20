@@ -17,14 +17,6 @@ This repository is organized around one runnable AniRate application, three incr
 |-- docs/
 |   |-- git-workflow.md
 |   `-- repo-map.md
-|-- archives/
-|   |-- duplicates/
-|   |   `-- schema-copy.sql
-|   `-- exports/
-|       |-- anime-platform.zip
-|       |-- anime-platform-v2.zip
-|       |-- anime-platform-v3.zip
-|       `-- anime-platform-v4.zip
 `-- CONTRIBUTING.md
 ```
 
@@ -80,5 +72,4 @@ Important rule: edit maintained source files under `apps/anirate-base/backend/sr
 
 - The reconstructed local base app currently runs with seeded in-memory data for easy startup.
 - The canonical SQL schema is `database/schema.sql`.
-- The duplicate SQL export was preserved as `archives/duplicates/schema-copy.sql`.
-- The original zip exports were moved to `archives/exports/`.
+- Generated build output like `.next/` and `dist/` can be regenerated locally and is intentionally not part of the maintained source tree.

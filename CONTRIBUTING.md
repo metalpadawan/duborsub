@@ -7,7 +7,7 @@ This repo is organized so the runnable application lives in `apps/anirate-base`,
 - Backend source of truth: `apps/anirate-base/backend/src`
 - Frontend source of truth: `apps/anirate-base/frontend/src`
 - Repo docs: `README.md`, `docs/`, and `apps/anirate-base/README.md`
-- Reference-only folders: `feature-packs/`, `archives/`, `.next/`, `dist/`, `node_modules/`
+- Reference-only folders: `feature-packs/`, `.next/`, `dist/`, `node_modules/`
 
 If you need to change behavior, edit the source files, not generated output.
 

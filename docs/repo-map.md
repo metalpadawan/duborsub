@@ -45,12 +45,8 @@ Each pack assumes the previous layer already exists.
 - `database/schema.sql` is the canonical SQL schema to use.
 - `apps/anirate-base/prisma/schema.prisma` is the Prisma model source for the base app.
 
-## Archives
-
-- `archives/exports/` keeps the original zip files that were previously cluttering the repo root.
-- `archives/duplicates/schema-copy.sql` preserves the extra SQL copy; its contents matched `database/schema.sql` when the repo was reorganized.
-
 ## Cleanup Notes
 
 - The old double-nested extracted folders were flattened.
 - Empty brace-named extraction artifact folders were removed from the working tree.
+- Archived zip exports, duplicate SQL copies, and generated build output were removed to keep the repo leaner.
