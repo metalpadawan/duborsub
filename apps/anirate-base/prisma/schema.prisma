@@ -32,9 +32,9 @@ enum AnimeStatus {
 // ============================================================
 
 model User {
-  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username             String    @unique @db.Citext
-  email                String    @unique @db.Citext
+  id                   String    @id @db.Uuid
+  username             String    @unique
+  email                String    @unique
   passwordHash         String    @map("password_hash")
   role                 UserRole  @default(user)
 
@@ -61,7 +61,7 @@ model User {
 }
 
 model Anime {
-  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id             String      @id @db.Uuid
   title          String      @db.VarChar(255)
   description    String?     @db.Text
   coverImageUrl  String?     @map("cover_image_url")
@@ -104,7 +104,7 @@ model AnimeGenre {
 }
 
 model Rating {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id         String    @id @db.Uuid
   userId     String    @map("user_id") @db.Uuid
   animeId    String    @map("anime_id") @db.Uuid
 
@@ -122,7 +122,7 @@ model Rating {
 }
 
 model Comment {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id         String    @id @db.Uuid
   userId     String    @map("user_id") @db.Uuid
   animeId    String    @map("anime_id") @db.Uuid
   parentId   String?   @map("parent_id") @db.Uuid
@@ -157,7 +157,7 @@ model CommentLike {
 }
 
 model PasswordResetToken {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id         String    @id @db.Uuid
   userId     String    @map("user_id") @db.Uuid
   tokenHash  String    @unique @map("token_hash")
   expiresAt  DateTime  @map("expires_at") @db.Timestamptz()
@@ -170,7 +170,7 @@ model PasswordResetToken {
 }
 
 model RefreshToken {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id         String    @id @db.Uuid
   userId     String    @map("user_id") @db.Uuid
   tokenHash  String    @unique @map("token_hash")
   ipAddress  String?   @map("ip_address")
@@ -185,7 +185,7 @@ model RefreshToken {
 }
 
 model AdminLog {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String   @id @db.Uuid
   adminId     String   @map("admin_id") @db.Uuid
   action      String   @db.VarChar(64)
   targetType  String?  @map("target_type") @db.VarChar(32)

@@ -1,5 +1,5 @@
-// The root module wires together the in-memory data layer and all feature modules
-// that make up the current runnable development version of AniRate.
+// The root module wires together the local file-backed datastore and all feature
+// modules that make up the current runnable development version of AniRate.
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';

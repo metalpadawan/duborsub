@@ -1,12 +1,14 @@
-// Prisma is preserved as a reference module because the original project design used it.
-// The current local runtime uses the in-memory DataService instead, but keeping this module
-// documented makes the future move back to Postgres much easier.
+// PrismaModule now provides the live PostgreSQL client plus a small development
+// seed bootstrap so the app can populate demo data in an empty database.
 import { Module, Global } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from './prisma.service';
+import { PrismaBootstrapService } from './prisma-bootstrap.service';
 
 @Global()
 @Module({
-  providers: [PrismaService],
+  imports: [ConfigModule],
+  providers: [PrismaService, PrismaBootstrapService],
   exports: [PrismaService],
 })
 export class PrismaModule {}

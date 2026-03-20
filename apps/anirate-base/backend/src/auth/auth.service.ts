@@ -1,6 +1,6 @@
 // AuthService owns account creation, login, refresh rotation, and password reset.
-// In the current runnable build it persists state in memory, but the API shape mirrors
-// what a database-backed service would look like.
+// It persists against the local file-backed datastore while keeping the same API
+// shape that the frontend was already built against.
 import {
   BadRequestException,
   ConflictException,
@@ -60,6 +60,7 @@ export class AuthService {
     };
 
     this.data.users.push(user);
+    this.data.save();
 
     return this.toPublicUser(user);
   }
@@ -86,6 +87,7 @@ export class AuthService {
       if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
         user.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60_000);
       }
+      this.data.save();
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -96,6 +98,7 @@ export class AuthService {
 
     const accessToken = await this.signAccessToken(user);
     const refreshToken = this.issueRefreshToken(user.id, ipAddress, userAgent);
+    this.data.save();
 
     return {
       user: this.toPublicUser(user),
@@ -125,6 +128,7 @@ export class AuthService {
     stored.revokedAt = new Date();
     const accessToken = await this.signAccessToken(user);
     const refreshToken = this.issueRefreshToken(user.id, ipAddress, userAgent);
+    this.data.save();
 
     return { accessToken, refreshToken };
   }
@@ -139,6 +143,7 @@ export class AuthService {
     const stored = this.data.refreshTokens.find((entry) => entry.tokenHash === tokenHash);
     if (stored) {
       stored.revokedAt = new Date();
+      this.data.save();
     }
   }
 
@@ -160,6 +165,7 @@ export class AuthService {
     };
 
     this.data.passwordResetTokens.push(record);
+    this.data.save();
 
     const response: Record<string, unknown> = {
       message: 'If that email exists, a reset link has been sent',
@@ -197,6 +203,7 @@ export class AuthService {
       .forEach((token) => {
         token.revokedAt = new Date();
       });
+    this.data.save();
 
     return { message: 'Password updated successfully' };
   }
@@ -206,6 +213,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+
     return this.toPublicUser(user);
   }
 
@@ -232,6 +240,7 @@ export class AuthService {
     };
 
     this.data.refreshTokens.push(record);
+
     return rawToken;
   }
 

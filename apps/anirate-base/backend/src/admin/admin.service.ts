@@ -80,6 +80,7 @@ export class AdminService {
       reason: dto.reason ?? null,
       durationDays: dto.durationDays ?? null,
     });
+    this.data.save();
 
     return { message: 'User banned' };
   }
@@ -96,12 +97,14 @@ export class AdminService {
     user.updatedAt = new Date();
 
     this.pushLog(adminId, 'UNBAN_USER', 'user', user.id, ipAddress, null);
+    this.data.save();
     return { message: 'User unbanned' };
   }
 
   deleteComment(adminId: string, commentId: string, ipAddress: string) {
     this.commentsService.softDeleteByAdmin(commentId);
     this.pushLog(adminId, 'DELETE_COMMENT', 'comment', commentId, ipAddress, null);
+    this.data.save();
     return { message: 'Comment removed' };
   }
 

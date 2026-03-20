@@ -1,8 +1,10 @@
-// DataService is a lightweight replacement for the missing persistent database layer.
-// It seeds realistic sample users, anime, ratings, comments, and admin logs so the
-// frontend and API can be explored immediately without any external setup.
-import { Injectable } from '@nestjs/common';
+// DataService is the current persistence boundary for the local AniRate runtime.
+// It seeds realistic sample data on first boot, then saves all later mutations to
+// a JSON datastore on disk so the app survives restarts without extra setup.
+import { Injectable, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { dirname, resolve } from 'path';
 import { randomUUID } from 'crypto';
 
 export type UserRole = 'user' | 'admin';
@@ -101,9 +103,55 @@ export interface AdminLogRecord {
   createdAt: Date;
 }
 
+interface PersistedSnapshot {
+  genres?: GenreRecord[];
+  users?: Array<Omit<UserRecord, 'bannedUntil' | 'lockedUntil' | 'lastLoginAt' | 'createdAt' | 'updatedAt'> & {
+    bannedUntil: string | Date | null;
+    lockedUntil: string | Date | null;
+    lastLoginAt: string | Date | null;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+  }>;
+  anime?: Array<Omit<AnimeRecord, 'createdAt' | 'updatedAt'> & {
+    createdAt: string | Date;
+    updatedAt: string | Date;
+  }>;
+  ratings?: Array<Omit<RatingRecord, 'createdAt' | 'updatedAt'> & {
+    createdAt: string | Date;
+    updatedAt: string | Date;
+  }>;
+  comments?: Array<Omit<CommentRecord, 'createdAt' | 'updatedAt'> & {
+    createdAt: string | Date;
+    updatedAt: string | Date;
+  }>;
+  commentLikes?: Array<Omit<CommentLikeRecord, 'createdAt'> & {
+    createdAt: string | Date;
+  }>;
+  refreshTokens?: Array<Omit<RefreshTokenRecord, 'expiresAt' | 'revokedAt' | 'createdAt'> & {
+    expiresAt: string | Date;
+    revokedAt: string | Date | null;
+    createdAt: string | Date;
+  }>;
+  passwordResetTokens?: Array<Omit<PasswordResetTokenRecord, 'expiresAt' | 'usedAt' | 'createdAt'> & {
+    expiresAt: string | Date;
+    usedAt: string | Date | null;
+    createdAt: string | Date;
+  }>;
+  adminLogs?: Array<Omit<AdminLogRecord, 'createdAt'> & {
+    createdAt: string | Date;
+  }>;
+}
+
+const DATA_FILE = resolve(__dirname, '..', '..', '.data', 'anirate-db.json');
+
 @Injectable()
 export class DataService {
-  // These arrays act as the current persistence boundary for the demo runtime.
+  private readonly logger = new Logger(DataService.name);
+  private readonly storagePath = DATA_FILE;
+
+  // These arrays are still the in-process working set, but they are now backed by
+  // a datastore file instead of disappearing whenever the server restarts.
+  readonly genres: GenreRecord[] = [];
   readonly users: UserRecord[] = [];
   readonly anime: AnimeRecord[] = [];
   readonly ratings: RatingRecord[] = [];
@@ -114,7 +162,7 @@ export class DataService {
   readonly adminLogs: AdminLogRecord[] = [];
 
   constructor() {
-    this.seed();
+    this.loadOrSeed();
   }
 
   findUserByEmail(email: string) {
@@ -134,6 +182,152 @@ export class DataService {
     return this.anime.find((entry) => entry.id === id) ?? null;
   }
 
+  save() {
+    // Saving uses an atomic rename so a partial write does not corrupt the datastore.
+    mkdirSync(dirname(this.storagePath), { recursive: true });
+    const tempFile = `${this.storagePath}.tmp`;
+    writeFileSync(tempFile, JSON.stringify(this.snapshot(), null, 2), 'utf8');
+    renameSync(tempFile, this.storagePath);
+  }
+
+  private loadOrSeed() {
+    if (this.loadFromDisk()) {
+      return;
+    }
+
+    this.seed();
+    this.save();
+  }
+
+  private loadFromDisk() {
+    if (!existsSync(this.storagePath)) {
+      return false;
+    }
+
+    try {
+      const raw = readFileSync(this.storagePath, 'utf8');
+      const snapshot = JSON.parse(raw) as PersistedSnapshot;
+      this.applySnapshot(snapshot);
+      return true;
+    } catch (error) {
+      this.logger.warn(`Failed to read persisted datastore, reseeding local data. ${(error as Error).message}`);
+      this.clearAll();
+      return false;
+    }
+  }
+
+  private snapshot(): PersistedSnapshot {
+    return {
+      genres: this.genres,
+      users: this.users,
+      anime: this.anime,
+      ratings: this.ratings,
+      comments: this.comments,
+      commentLikes: this.commentLikes,
+      refreshTokens: this.refreshTokens,
+      passwordResetTokens: this.passwordResetTokens,
+      adminLogs: this.adminLogs,
+    };
+  }
+
+  private applySnapshot(snapshot: PersistedSnapshot) {
+    this.clearAll();
+
+    const genres = snapshot.genres?.length
+      ? snapshot.genres
+      : this.collectGenres(snapshot.anime ?? []);
+
+    this.genres.push(...genres);
+    this.users.push(
+      ...(snapshot.users ?? []).map((user) => ({
+        ...user,
+        bannedUntil: this.toDate(user.bannedUntil),
+        lockedUntil: this.toDate(user.lockedUntil),
+        lastLoginAt: this.toDate(user.lastLoginAt),
+        createdAt: this.toDate(user.createdAt),
+        updatedAt: this.toDate(user.updatedAt),
+      })),
+    );
+    this.anime.push(
+      ...(snapshot.anime ?? []).map((anime) => ({
+        ...anime,
+        genres: anime.genres ?? [],
+        createdAt: this.toDate(anime.createdAt),
+        updatedAt: this.toDate(anime.updatedAt),
+      })),
+    );
+    this.ratings.push(
+      ...(snapshot.ratings ?? []).map((rating) => ({
+        ...rating,
+        createdAt: this.toDate(rating.createdAt),
+        updatedAt: this.toDate(rating.updatedAt),
+      })),
+    );
+    this.comments.push(
+      ...(snapshot.comments ?? []).map((comment) => ({
+        ...comment,
+        createdAt: this.toDate(comment.createdAt),
+        updatedAt: this.toDate(comment.updatedAt),
+      })),
+    );
+    this.commentLikes.push(
+      ...(snapshot.commentLikes ?? []).map((like) => ({
+        ...like,
+        createdAt: this.toDate(like.createdAt),
+      })),
+    );
+    this.refreshTokens.push(
+      ...(snapshot.refreshTokens ?? []).map((token) => ({
+        ...token,
+        expiresAt: this.toDate(token.expiresAt),
+        revokedAt: this.toDate(token.revokedAt),
+        createdAt: this.toDate(token.createdAt),
+      })),
+    );
+    this.passwordResetTokens.push(
+      ...(snapshot.passwordResetTokens ?? []).map((token) => ({
+        ...token,
+        expiresAt: this.toDate(token.expiresAt),
+        usedAt: this.toDate(token.usedAt),
+        createdAt: this.toDate(token.createdAt),
+      })),
+    );
+    this.adminLogs.push(
+      ...(snapshot.adminLogs ?? []).map((log) => ({
+        ...log,
+        createdAt: this.toDate(log.createdAt),
+      })),
+    );
+  }
+
+  private clearAll() {
+    this.genres.length = 0;
+    this.users.length = 0;
+    this.anime.length = 0;
+    this.ratings.length = 0;
+    this.comments.length = 0;
+    this.commentLikes.length = 0;
+    this.refreshTokens.length = 0;
+    this.passwordResetTokens.length = 0;
+    this.adminLogs.length = 0;
+  }
+
+  private collectGenres(animeRecords: Array<{ genres?: GenreRecord[] }>) {
+    const unique = new Map<number, GenreRecord>();
+
+    animeRecords.forEach((anime) => {
+      anime.genres?.forEach((genre) => {
+        unique.set(genre.id, genre);
+      });
+    });
+
+    return Array.from(unique.values()).sort((left, right) => left.id - right.id);
+  }
+
+  private toDate(value: string | Date | null) {
+    return value ? new Date(value) : null;
+  }
+
   private seed() {
     if (this.users.length > 0) {
       return;
@@ -145,6 +339,17 @@ export class DataService {
     const demoId = randomUUID();
     const guestId = randomUUID();
     const passwordHash = bcrypt.hashSync('Password123!', 10);
+
+    const genres: GenreRecord[] = [
+      { id: 1, name: 'Action' },
+      { id: 2, name: 'Adventure' },
+      { id: 3, name: 'Drama' },
+      { id: 4, name: 'Fantasy' },
+      { id: 5, name: 'Mystery' },
+      { id: 6, name: 'Sci-Fi' },
+    ];
+
+    this.genres.push(...genres);
 
     this.users.push(
       {
@@ -193,15 +398,6 @@ export class DataService {
         updatedAt: now,
       },
     );
-
-    const genres: GenreRecord[] = [
-      { id: 1, name: 'Action' },
-      { id: 2, name: 'Adventure' },
-      { id: 3, name: 'Drama' },
-      { id: 4, name: 'Fantasy' },
-      { id: 5, name: 'Mystery' },
-      { id: 6, name: 'Sci-Fi' },
-    ];
 
     const animeOne = randomUUID();
     const animeTwo = randomUUID();

@@ -31,23 +31,47 @@ The `feature-packs/` directories are preserved add-on snapshots, not standalone 
 
 ## Run The App
 
-Install dependencies if this is a fresh clone:
+Install root tooling if this is a fresh clone:
 
 ```powershell
-npm --prefix ".\apps\anirate-base\backend" install
-npm --prefix ".\apps\anirate-base\frontend" install
+npm install
 ```
 
-Start the backend in one terminal:
+Install app dependencies if needed:
 
 ```powershell
-npm --prefix ".\apps\anirate-base\backend" run start:dev
+npm run setup
 ```
 
-Start the frontend in another terminal:
+Start both apps from the repo root:
 
 ```powershell
-npm --prefix ".\apps\anirate-base\frontend" run dev
+npm run dev
+```
+
+If old dev servers are still hanging onto ports, do a clean restart:
+
+```powershell
+npm run dev:fresh
+```
+
+If you just want to see which ports are occupied:
+
+```powershell
+npm run ports:status
+```
+
+Build both apps from the repo root:
+
+```powershell
+npm run build
+```
+
+Run the quality checks from the repo root:
+
+```powershell
+npm run lint
+npm run test
 ```
 
 Then open:
@@ -70,6 +94,6 @@ Important rule: edit maintained source files under `apps/anirate-base/backend/sr
 
 ## Notes
 
-- The reconstructed local base app currently runs with seeded in-memory data for easy startup.
+- The local base app now persists its demo data to `apps/anirate-base/backend/.data/anirate-db.json` so changes survive restarts.
 - The canonical SQL schema is `database/schema.sql`.
 - Generated build output like `.next/` and `dist/` can be regenerated locally and is intentionally not part of the maintained source tree.

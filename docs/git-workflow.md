@@ -68,6 +68,32 @@ If you already have local edits, check the diff first so you understand what mig
 
 ## Useful Run Commands
 
+Install root tooling:
+
+```powershell
+npm install
+```
+
+Install app dependencies:
+
+```powershell
+npm run setup
+```
+
+Start both apps:
+
+```powershell
+npm run dev
+```
+
+Cleanly stop the common local dev ports and restart:
+
+```powershell
+npm run dev:fresh
+```
+
+If you need to run them separately:
+
 Backend:
 
 ```powershell
@@ -83,6 +109,7 @@ npm --prefix ".\apps\anirate-base\frontend" run dev
 Validation:
 
 ```powershell
-npm --prefix ".\apps\anirate-base\backend" run build
-npm --prefix ".\apps\anirate-base\frontend" run build
+npm run lint
+npm run test
+npm run build
 ```

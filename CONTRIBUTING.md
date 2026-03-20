@@ -13,18 +13,28 @@ If you need to change behavior, edit the source files, not generated output.
 
 ## Local Setup
 
-Install dependencies:
+Install root tooling:
 
 ```powershell
-npm --prefix ".\apps\anirate-base\backend" install
-npm --prefix ".\apps\anirate-base\frontend" install
+npm install
+```
+
+Install app dependencies:
+
+```powershell
+npm run setup
 ```
 
 Run the app:
 
 ```powershell
-npm --prefix ".\apps\anirate-base\backend" run start:dev
-npm --prefix ".\apps\anirate-base\frontend" run dev
+npm run dev
+```
+
+If an older frontend or backend process is still using the expected ports:
+
+```powershell
+npm run dev:fresh
 ```
 
 ## Suggested Git Workflow
@@ -79,8 +89,9 @@ git commit -m "docs: improve git workflow guidance"
 The most useful checks for this repo are:
 
 ```powershell
-npm --prefix ".\apps\anirate-base\backend" run build
-npm --prefix ".\apps\anirate-base\frontend" run build
+npm run lint
+npm run test
+npm run build
 ```
 
 See `docs/git-workflow.md` for a slightly more detailed command reference.

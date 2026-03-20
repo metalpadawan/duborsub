@@ -11,5 +11,6 @@ out/
 .env.*
 !.env.example
 !.env.local.example
+apps/anirate-base/backend/.data/
 .DS_Store
 Thumbs.db

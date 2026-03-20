@@ -101,6 +101,7 @@ export class AnimeService {
     };
 
     this.data.anime.push(anime);
+    this.data.save();
     return this.enrichAnime(anime.id);
   }
 
@@ -120,6 +121,7 @@ export class AnimeService {
     if (dto.genreIds !== undefined) anime.genres = this.pickGenres(dto.genreIds);
     anime.updatedAt = new Date();
 
+    this.data.save();
     return this.enrichAnime(id);
   }
 
@@ -135,9 +137,12 @@ export class AnimeService {
       .filter((rating) => rating.animeId === id)
       .forEach((rating) => {
         const ratingIndex = this.data.ratings.indexOf(rating);
-        if (ratingIndex >= 0) this.data.ratings.splice(ratingIndex, 1);
+        if (ratingIndex >= 0) {
+          this.data.ratings.splice(ratingIndex, 1);
+        }
       });
 
+    this.data.save();
     return { message: 'Anime deleted' };
   }
 

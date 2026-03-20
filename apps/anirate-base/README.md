@@ -6,7 +6,7 @@ This is the runnable base application for the repo. It contains the Nest backend
 
 - `backend/` is the local Nest API
 - `frontend/` is the local Next.js app
-- the current development build uses seeded in-memory data so it can boot without PostgreSQL
+- the current development build persists local data to `backend/.data/anirate-db.json`, so it can boot without PostgreSQL
 - `../../database/schema.sql` remains the canonical SQL schema for future database wiring
 
 ## Project Structure
@@ -28,13 +28,26 @@ apps/anirate-base/
 From the repo root:
 
 ```powershell
-npm --prefix ".\apps\anirate-base\backend" run start:dev
+npm run dev
 ```
 
-In a second terminal:
+If stale processes are still holding onto ports:
 
 ```powershell
-npm --prefix ".\apps\anirate-base\frontend" run dev
+npm run dev:fresh
+```
+
+If you need to install app dependencies from the root first:
+
+```powershell
+npm run setup
+```
+
+Quality checks from the repo root:
+
+```powershell
+npm run lint
+npm run test
 ```
 
 Open:

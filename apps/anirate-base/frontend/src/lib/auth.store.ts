@@ -43,9 +43,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       // On a hard refresh we no longer have the in-memory access token, so we
       // first ask the backend to rotate the refresh cookie into a new token.
-      const { data: refreshData } = await import('./api').then((m) =>
-        m.api.post<{ accessToken: string }>('/auth/refresh'),
-      );
+      const { data: refreshData } = await authApi.refresh();
       tokenStore.set(refreshData.accessToken);
 
       // Once a fresh token exists, we can safely ask for the current user.

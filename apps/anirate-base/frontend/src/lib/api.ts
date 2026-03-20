@@ -1,10 +1,50 @@
 // This file centralizes frontend API access.
 // It also owns access-token memory storage and automatic refresh retry behavior.
-import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
 
-type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+type RetryableConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+  skipAuthRefresh?: boolean;
+};
+
+const AUTH_REFRESH_EXCLUDED_PATHS = new Set([
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/logout',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+]);
+
+function normalizeRequestPath(url?: string) {
+  if (!url) {
+    return '';
+  }
+
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      return new URL(url).pathname;
+    } catch {
+      return url;
+    }
+  }
+
+  return url.startsWith('/') ? url : `/${url}`;
+}
+
+function shouldSkipAuthRefresh(config?: RetryableConfig) {
+  if (!config) {
+    return true;
+  }
+
+  if (config.skipAuthRefresh) {
+    return true;
+  }
+
+  return AUTH_REFRESH_EXCLUDED_PATHS.has(normalizeRequestPath(config.url));
+}
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
@@ -40,7 +80,12 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config as RetryableConfig | undefined;
-    if (!original || error.response?.status !== 401 || original._retry) {
+    if (
+      !original ||
+      error.response?.status !== 401 ||
+      original._retry ||
+      shouldSkipAuthRefresh(original)
+    ) {
       return Promise.reject(error);
     }
 
@@ -49,7 +94,9 @@ api.interceptors.response.use(
     if (!refreshPromise) {
       // Concurrent 401s should wait on one refresh request instead of stampeding the API.
       refreshPromise = api
-        .post<{ accessToken: string }>('/auth/refresh')
+        .post<{ accessToken: string }>('/auth/refresh', undefined, {
+          skipAuthRefresh: true,
+        } as RetryableConfig)
         .then((response) => {
           tokenStore.set(response.data.accessToken);
           return response.data.accessToken;
@@ -78,13 +125,22 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
-  register: (data: RegisterPayload) => api.post('/auth/register', data),
-  login: (data: LoginPayload) => api.post<{ user: User; accessToken: string }>('/auth/login', data),
-  logout: () => api.post('/auth/logout'),
+  register: (data: RegisterPayload) =>
+    api.post('/auth/register', data, { skipAuthRefresh: true } as RetryableConfig),
+  login: (data: LoginPayload) =>
+    api.post<{ user: User; accessToken: string }>('/auth/login', data, {
+      skipAuthRefresh: true,
+    } as RetryableConfig),
+  refresh: () =>
+    api.post<{ accessToken: string }>('/auth/refresh', undefined, {
+      skipAuthRefresh: true,
+    } as RetryableConfig),
+  logout: () => api.post('/auth/logout', undefined, { skipAuthRefresh: true } as RetryableConfig),
   me: () => api.get<User>('/auth/me'),
-  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  forgotPassword: (email: string) =>
+    api.post('/auth/forgot-password', { email }, { skipAuthRefresh: true } as RetryableConfig),
   resetPassword: (token: string, newPassword: string) =>
-    api.post('/auth/reset-password', { token, newPassword }),
+    api.post('/auth/reset-password', { token, newPassword }, { skipAuthRefresh: true } as RetryableConfig),
 };
 
 export const animeApi = {

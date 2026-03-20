@@ -59,6 +59,7 @@ export class CommentsService {
     };
 
     this.data.comments.push(created);
+    this.data.save();
     return this.serializeComment(created.id);
   }
 
@@ -70,6 +71,7 @@ export class CommentsService {
 
     comment.content = dto.content.trim();
     comment.updatedAt = new Date();
+    this.data.save();
     return this.serializeComment(comment.id);
   }
 
@@ -82,6 +84,7 @@ export class CommentsService {
     comment.isDeleted = true;
     comment.content = '[deleted]';
     comment.updatedAt = new Date();
+    this.data.save();
     return { message: 'Comment deleted' };
   }
 
@@ -94,6 +97,7 @@ export class CommentsService {
 
     if (existing) {
       existing.value = dto.value;
+      this.data.save();
       return { message: 'Vote updated' };
     }
 
@@ -103,6 +107,7 @@ export class CommentsService {
       value: dto.value,
       createdAt: new Date(),
     });
+    this.data.save();
     return { message: 'Vote recorded' };
   }
 
@@ -112,6 +117,7 @@ export class CommentsService {
     );
     if (index >= 0) {
       this.data.commentLikes.splice(index, 1);
+      this.data.save();
     }
     return { message: 'Vote removed' };
   }
@@ -121,6 +127,7 @@ export class CommentsService {
     comment.isDeleted = true;
     comment.content = '[removed by moderator]';
     comment.updatedAt = new Date();
+    this.data.save();
   }
 
   private serializeComment(commentId: string) {

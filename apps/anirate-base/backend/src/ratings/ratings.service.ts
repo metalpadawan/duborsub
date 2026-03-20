@@ -25,6 +25,7 @@ export class RatingsService {
       if (dto.subRating !== undefined) existing.subRating = dto.subRating;
       if (dto.dubRating !== undefined) existing.dubRating = dto.dubRating;
       existing.updatedAt = new Date();
+      this.data.save();
       return existing;
     }
 
@@ -38,6 +39,7 @@ export class RatingsService {
       updatedAt: new Date(),
     };
     this.data.ratings.push(created);
+    this.data.save();
     return created;
   }
 
@@ -54,6 +56,7 @@ export class RatingsService {
     const index = this.data.ratings.findIndex((rating) => rating.userId === userId && rating.animeId === animeId);
     if (index >= 0) {
       this.data.ratings.splice(index, 1);
+      this.data.save();
     }
     return { message: 'Rating removed' };
   }

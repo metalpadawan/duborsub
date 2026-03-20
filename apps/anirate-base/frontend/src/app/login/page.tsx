@@ -37,6 +37,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error ? (
           <div
+            role="alert"
             className="text-sm px-3 py-2 rounded-lg"
             style={{
               background: 'rgba(239,68,68,0.1)',
@@ -49,10 +50,11 @@ export default function LoginPage() {
         ) : null}
 
         <div>
-          <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-3)' }}>
+          <label htmlFor="email" className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-3)' }}>
             Email
           </label>
           <input
+            id="email"
             type="email"
             className="input"
             required
@@ -63,10 +65,11 @@ export default function LoginPage() {
         </div>
 
         <div>
-          <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-3)' }}>
+          <label htmlFor="password" className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-3)' }}>
             Password
           </label>
           <input
+            id="password"
             type="password"
             className="input"
             required
