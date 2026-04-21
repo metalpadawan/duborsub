@@ -14,6 +14,8 @@ export class AppController {
         auth: '/api/v1/auth/login',
         me: '/api/v1/auth/me',
         admin: '/api/v1/admin/dashboard',
+        health: '/api/v1/health',
+        monitoring: '/api/v1/monitoring',
       },
     };
   }

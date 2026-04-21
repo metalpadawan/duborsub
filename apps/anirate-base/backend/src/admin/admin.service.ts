@@ -1,8 +1,9 @@
 // AdminService provides moderation actions plus simple aggregate views for dashboard pages.
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CommentsService } from '../comments/comments.service';
 import { DataService } from '../data/data.service';
+import { MonitoringService } from '../monitoring/monitoring.service';
 import { AdminQueryDto, BanUserDto } from './dto/admin.dto';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class AdminService {
   constructor(
     private readonly data: DataService,
     private readonly commentsService: CommentsService,
+    private readonly monitoring: MonitoringService,
   ) {}
 
   getDashboardStats() {
@@ -69,6 +71,10 @@ export class AdminService {
       throw new NotFoundException('User not found');
     }
 
+    if (user.id === adminId || user.role === 'admin') {
+      throw new ForbiddenException('Admin accounts require a higher-privilege moderation workflow');
+    }
+
     user.isBanned = true;
     user.banReason = dto.reason ?? null;
     user.bannedUntil = dto.durationDays
@@ -80,7 +86,22 @@ export class AdminService {
       reason: dto.reason ?? null,
       durationDays: dto.durationDays ?? null,
     });
+    this.data.refreshTokens
+      .filter((token) => token.userId === user.id && !token.revokedAt)
+      .forEach((token) => {
+        token.revokedAt = new Date();
+      });
     this.data.save();
+    this.monitoring.recordSecurityEvent({
+      type: 'admin.user_banned',
+      severity: 'warning',
+      message: 'An administrator banned a user and revoked active sessions',
+      userId: user.id,
+      ipAddress: ipAddress || null,
+      metadata: {
+        adminId,
+      },
+    });
 
     return { message: 'User banned' };
   }
@@ -98,6 +119,16 @@ export class AdminService {
 
     this.pushLog(adminId, 'UNBAN_USER', 'user', user.id, ipAddress, null);
     this.data.save();
+    this.monitoring.recordSecurityEvent({
+      type: 'admin.user_unbanned',
+      severity: 'info',
+      message: 'An administrator restored a user account',
+      userId: user.id,
+      ipAddress: ipAddress || null,
+      metadata: {
+        adminId,
+      },
+    });
     return { message: 'User unbanned' };
   }
 
@@ -105,6 +136,16 @@ export class AdminService {
     this.commentsService.softDeleteByAdmin(commentId);
     this.pushLog(adminId, 'DELETE_COMMENT', 'comment', commentId, ipAddress, null);
     this.data.save();
+    this.monitoring.recordSecurityEvent({
+      type: 'admin.comment_deleted',
+      severity: 'info',
+      message: 'An administrator removed a comment',
+      ipAddress: ipAddress || null,
+      metadata: {
+        adminId,
+        commentId,
+      },
+    });
     return { message: 'Comment removed' };
   }
 

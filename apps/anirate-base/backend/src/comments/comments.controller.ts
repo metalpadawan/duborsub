@@ -43,32 +43,42 @@ export class CommentsController {
   @Patch(':commentId')
   @UseGuards(JwtAuthGuard)
   update(
+    @Param('animeId', ParseUUIDPipe) animeId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateCommentDto,
   ) {
-    return this.commentsService.update(user.id, commentId, dto);
+    return this.commentsService.update(user.id, animeId, commentId, dto);
   }
 
   @Delete(':commentId')
   @UseGuards(JwtAuthGuard)
-  remove(@Param('commentId', ParseUUIDPipe) commentId: string, @CurrentUser() user: { id: string }) {
-    return this.commentsService.remove(user.id, commentId);
+  remove(
+    @Param('animeId', ParseUUIDPipe) animeId: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.commentsService.remove(user.id, animeId, commentId);
   }
 
   @Post(':commentId/like')
   @UseGuards(JwtAuthGuard)
   like(
+    @Param('animeId', ParseUUIDPipe) animeId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: VoteCommentDto,
   ) {
-    return this.commentsService.vote(user.id, commentId, dto);
+    return this.commentsService.vote(user.id, animeId, commentId, dto);
   }
 
   @Delete(':commentId/like')
   @UseGuards(JwtAuthGuard)
-  unlike(@Param('commentId', ParseUUIDPipe) commentId: string, @CurrentUser() user: { id: string }) {
-    return this.commentsService.removeVote(user.id, commentId);
+  unlike(
+    @Param('animeId', ParseUUIDPipe) animeId: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.commentsService.removeVote(user.id, animeId, commentId);
   }
 }

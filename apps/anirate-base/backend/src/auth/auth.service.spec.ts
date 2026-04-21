@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth.dto';
 import { DataService, PasswordResetTokenRecord, RefreshTokenRecord, UserRecord } from '../data/data.service';
+import { MonitoringService } from '../monitoring/monitoring.service';
 
 type DataServiceMock = Pick<
   DataService,
@@ -54,26 +55,42 @@ function createDataServiceMock(initialUsers: UserRecord[] = []): DataServiceMock
 describe('AuthService', () => {
   let jwt: JwtService;
   let config: ConfigService;
+  let monitoring: MonitoringService;
 
   beforeEach(() => {
     jwt = {
       signAsync: jest.fn(async () => 'signed-access-token'),
     } as unknown as JwtService;
 
+    const configValues: Record<string, unknown> = {
+      NODE_ENV: 'development',
+      ACCESS_TOKEN_TTL_MINUTES: 10,
+      REFRESH_TOKEN_TTL_HOURS: 24,
+      JWT_ISSUER: 'anirate-api',
+      JWT_AUDIENCE: 'anirate-web',
+    };
+
     config = {
       get: jest.fn().mockImplementation((key: string, fallback?: string) => {
-        if (key === 'NODE_ENV') {
-          return 'development';
+        return key in configValues ? configValues[key] : fallback;
+      }),
+      getOrThrow: jest.fn().mockImplementation((key: string) => {
+        if (!(key in configValues)) {
+          throw new Error(`Missing config value for ${key}`);
         }
 
-        return fallback;
+        return configValues[key];
       }),
     } as unknown as ConfigService;
+
+    monitoring = {
+      recordSecurityEvent: jest.fn(),
+    } as unknown as MonitoringService;
   });
 
   it('registers a new user, lowercases the email, and persists the change', async () => {
     const data = createDataServiceMock();
-    const service = new AuthService(data as unknown as DataService, jwt, config);
+    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
     const dto: RegisterDto = {
       username: 'NewUser',
       email: 'NewUser@Example.com',
@@ -93,7 +110,7 @@ describe('AuthService', () => {
   it('rejects invalid credentials and records the failed attempt', async () => {
     const user = createUser();
     const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config);
+    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
     const dto: LoginDto = {
       email: user.email,
       password: 'DefinitelyWrong123!',
@@ -108,7 +125,7 @@ describe('AuthService', () => {
   it('locks an account after too many failed login attempts', async () => {
     const user = createUser({ failedLoginAttempts: 4 });
     const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config);
+    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
 
     await expect(
       service.login(
@@ -128,7 +145,7 @@ describe('AuthService', () => {
   it('returns tokens and rotates refresh sessions on successful login and refresh', async () => {
     const user = createUser();
     const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config);
+    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
 
     const loginResult = await service.login(
       {
@@ -156,17 +173,40 @@ describe('AuthService', () => {
   it('rejects refresh requests when the original session is missing', async () => {
     const user = createUser();
     const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config);
+    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
 
     await expect(service.refresh('missing-token', '127.0.0.1', 'jest')).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
+  it('revokes every session when a revoked refresh token is reused', async () => {
+    const user = createUser();
+    const data = createDataServiceMock([user]);
+    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+
+    const loginResult = await service.login(
+      {
+        email: user.email,
+        password: 'Password123!',
+      },
+      '127.0.0.1',
+      'jest',
+    );
+
+    await service.refresh(loginResult.refreshToken, '127.0.0.1', 'jest');
+
+    await expect(service.refresh(loginResult.refreshToken, '127.0.0.1', 'jest')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+
+    expect(data.refreshTokens.every((token) => token.revokedAt instanceof Date)).toBe(true);
+  });
+
   it('issues a debug reset token in development and updates the password when it is used', async () => {
     const user = createUser();
     const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config);
+    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
 
     const forgotPassword = await service.forgotPassword({ email: user.email });
 
@@ -192,7 +232,7 @@ describe('AuthService', () => {
       bannedUntil: new Date(Date.now() + 60_000),
     });
     const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config);
+    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
 
     await expect(
       service.login(

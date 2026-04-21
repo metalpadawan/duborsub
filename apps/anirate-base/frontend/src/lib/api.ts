@@ -2,7 +2,33 @@
 // It also owns access-token memory storage and automatic refresh retry behavior.
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
+const LOCAL_API_FALLBACK = 'http://localhost:4000/api/v1';
+
+function resolveBaseUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const candidate = configuredUrl || (process.env.NODE_ENV !== 'production' ? LOCAL_API_FALLBACK : '');
+
+  if (!candidate) {
+    throw new Error('NEXT_PUBLIC_API_URL must be configured');
+  }
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error('NEXT_PUBLIC_API_URL must be a valid absolute URL');
+  }
+
+  const isLocal = ['localhost', '127.0.0.1'].includes(parsed.hostname);
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLocal)) {
+    throw new Error('NEXT_PUBLIC_API_URL must use HTTPS outside local development');
+  }
+
+  return parsed.toString().replace(/\/$/, '');
+}
+
+const BASE_URL = resolveBaseUrl();
 
 type RetryableConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;

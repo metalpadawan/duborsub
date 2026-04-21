@@ -1,5 +1,5 @@
 // CommentsService manages threaded discussion state, ownership checks, and vote totals.
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataService } from '../data/data.service';
 import {
@@ -47,6 +47,13 @@ export class CommentsService {
       throw new NotFoundException('Anime not found');
     }
 
+    if (dto.parentId) {
+      const parent = this.findComment(dto.parentId, animeId);
+      if (parent.isDeleted) {
+        throw new BadRequestException('You cannot reply to a deleted comment');
+      }
+    }
+
     const created = {
       id: randomUUID(),
       userId,
@@ -63,20 +70,24 @@ export class CommentsService {
     return this.serializeComment(created.id);
   }
 
-  update(userId: string, commentId: string, dto: UpdateCommentDto) {
-    const comment = this.findComment(commentId);
+  update(userId: string, animeId: string, commentId: string, dto: UpdateCommentDto) {
+    const comment = this.findComment(commentId, animeId);
     if (comment.userId !== userId) {
       throw new ForbiddenException('You can only edit your own comments');
     }
 
-    comment.content = dto.content.trim();
+    if (comment.isDeleted) {
+      throw new BadRequestException('Deleted comments cannot be edited');
+    }
+
+    comment.content = dto.content;
     comment.updatedAt = new Date();
     this.data.save();
     return this.serializeComment(comment.id);
   }
 
-  remove(userId: string, commentId: string) {
-    const comment = this.findComment(commentId);
+  remove(userId: string, animeId: string, commentId: string) {
+    const comment = this.findComment(commentId, animeId);
     if (comment.userId !== userId) {
       throw new ForbiddenException('You can only delete your own comments');
     }
@@ -88,9 +99,13 @@ export class CommentsService {
     return { message: 'Comment deleted' };
   }
 
-  vote(userId: string, commentId: string, dto: VoteCommentDto) {
+  vote(userId: string, animeId: string, commentId: string, dto: VoteCommentDto) {
     // Voting is an upsert so repeated likes/dislikes simply overwrite the prior choice.
-    this.findComment(commentId);
+    const comment = this.findComment(commentId, animeId);
+    if (comment.isDeleted) {
+      throw new BadRequestException('Deleted comments cannot receive votes');
+    }
+
     const existing = this.data.commentLikes.find(
       (like) => like.commentId === commentId && like.userId === userId,
     );
@@ -111,7 +126,8 @@ export class CommentsService {
     return { message: 'Vote recorded' };
   }
 
-  removeVote(userId: string, commentId: string) {
+  removeVote(userId: string, animeId: string, commentId: string) {
+    this.findComment(commentId, animeId);
     const index = this.data.commentLikes.findIndex(
       (like) => like.commentId === commentId && like.userId === userId,
     );
@@ -163,9 +179,9 @@ export class CommentsService {
     };
   }
 
-  private findComment(commentId: string) {
+  private findComment(commentId: string, animeId?: string) {
     const comment = this.data.comments.find((entry) => entry.id === commentId) ?? null;
-    if (!comment) {
+    if (!comment || (animeId && comment.animeId !== animeId)) {
       throw new NotFoundException('Comment not found');
     }
     return comment;

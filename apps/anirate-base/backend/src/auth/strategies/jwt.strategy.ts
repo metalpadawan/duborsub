@@ -17,7 +17,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get('JWT_SECRET', 'dev-secret-change-me'),
+      secretOrKey: config.getOrThrow<string>('JWT_SECRET'),
+      issuer: config.getOrThrow<string>('JWT_ISSUER'),
+      audience: config.getOrThrow<string>('JWT_AUDIENCE'),
     });
   }
 
@@ -28,6 +30,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     if (user.isBanned && (!user.bannedUntil || user.bannedUntil > new Date())) {
+      throw new UnauthorizedException();
+    }
+
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
       throw new UnauthorizedException();
     }
 

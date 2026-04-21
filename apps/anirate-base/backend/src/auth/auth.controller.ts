@@ -11,34 +11,35 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
-import { CurrentUser } from './decorators/current-user.decorator';
+import { TrustedOriginGuard } from '../common/guards/trusted-origin.guard';
 import { AuthService } from './auth.service';
+import { CurrentUser } from './decorators/current-user.decorator';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
-const cookieOptions = {
-  httpOnly: true,
-  secure: false,
-  sameSite: 'lax' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-  path: '/api/v1/auth',
-};
-
 @Controller('auth')
+@UseGuards(TrustedOriginGuard)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res() res: Response) {
     const session = await this.authService.login(dto, req.ip ?? '', req.headers['user-agent'] ?? '');
-    res.cookie('refresh_token', session.refreshToken, cookieOptions);
+    res.cookie('refresh_token', session.refreshToken, this.getRefreshCookieOptions());
     res.json({
       user: session.user,
       accessToken: session.accessToken,
@@ -47,27 +48,31 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async refresh(@Req() req: Request, @Res() res: Response) {
     const rawToken = req.cookies?.refresh_token;
     const session = await this.authService.refresh(rawToken, req.ip ?? '', req.headers['user-agent'] ?? '');
-    res.cookie('refresh_token', session.refreshToken, cookieOptions);
+    res.cookie('refresh_token', session.refreshToken, this.getRefreshCookieOptions());
     res.json({ accessToken: session.accessToken });
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async logout(@Req() req: Request, @Res() res: Response) {
     await this.authService.logout(req.cookies?.refresh_token);
-    res.clearCookie('refresh_token', { path: '/api/v1/auth' });
+    res.clearCookie('refresh_token', this.getRefreshCookieOptions());
     res.send();
   }
 
   @Post('forgot-password')
+  @Throttle({ default: { limit: 3, ttl: 15 * 60_000 } })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
 
   @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 15 * 60_000 } })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
@@ -76,5 +81,15 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() user: { id: string }) {
     return this.authService.getMe(user.id);
+  }
+
+  private getRefreshCookieOptions() {
+    return {
+      httpOnly: true,
+      secure: this.config.getOrThrow<boolean>('COOKIE_SECURE'),
+      sameSite: this.config.getOrThrow<'lax' | 'strict' | 'none'>('COOKIE_SAME_SITE'),
+      maxAge: this.authService.getRefreshTokenTtlMs(),
+      path: '/api/v1/auth',
+    };
   }
 }

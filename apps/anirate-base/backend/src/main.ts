@@ -1,59 +1,71 @@
 // Application bootstrap configures shared HTTP concerns once:
-// security headers, cookies, CORS, validation, and the versioned API prefix.
+// security headers, cookies, CORS, validation, logging, and the versioned API prefix.
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { MonitoringService } from './monitoring/monitoring.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  const monitoring = app.get(MonitoringService);
+  const logger = new Logger('Bootstrap');
 
-  // ── Security headers ──────────────────────────────────────
+  if (config.get<boolean>('TRUST_PROXY')) {
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  }
+
   app.use(
     helmet({
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          imgSrc: ["'self'", 'data:', 'https://cdn.example.com'],
+          imgSrc: ["'self'", 'data:', 'https:'],
           scriptSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
+          connectSrc: ["'self'"],
+          frameAncestors: ["'none'"],
         },
       },
       hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
       referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      crossOriginEmbedderPolicy: false,
     }),
   );
 
-  // ── Cookie parser (for refresh token httpOnly cookie) ────
   app.use(cookieParser());
 
-  // ── CORS ─────────────────────────────────────────────────
   app.enableCors({
-    origin: config.get<string>('FRONTEND_URL', 'http://localhost:3000'),
+    origin: config.getOrThrow<string>('FRONTEND_URL'),
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+    exposedHeaders: ['X-Request-Id'],
   });
 
-  // ── Global validation pipe ────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,           // strip unknown fields
+      whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
+      stopAtFirstError: false,
     }),
   );
 
-  // ── API prefix ────────────────────────────────────────────
   app.setGlobalPrefix('api/v1');
+  app.useGlobalFilters(new GlobalExceptionFilter(monitoring));
+  app.useGlobalInterceptors(new RequestLoggingInterceptor(monitoring));
+  app.enableShutdownHooks();
 
-  const port = config.get<number>('PORT', 4000);
-  await app.listen(port);
-  console.log(`🚀 API running on http://localhost:${port}/api/v1`);
+  const port = config.getOrThrow<number>('PORT');
+  await app.listen(port, '0.0.0.0');
+  logger.log(`API running on http://localhost:${port}/api/v1`);
 }
 
 bootstrap();

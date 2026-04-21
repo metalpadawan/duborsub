@@ -18,10 +18,9 @@ import {
   RefreshTokenRecord,
   UserRecord,
 } from '../data/data.service';
+import { MonitoringService } from '../monitoring/monitoring.service';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth.dto';
 
-const ACCESS_TOKEN_MINUTES = 15;
-const REFRESH_TOKEN_DAYS = 7;
 const LOCKOUT_MINUTES = 15;
 const MAX_FAILED_ATTEMPTS = 5;
 
@@ -31,6 +30,7 @@ export class AuthService {
     private readonly data: DataService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly monitoring: MonitoringService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -69,14 +69,37 @@ export class AuthService {
     // Login is where lockout rules, ban checks, and session creation all converge.
     const user = this.data.findUserByEmail(dto.email);
     if (!user) {
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.login.failed',
+        severity: 'warning',
+        message: 'Failed login attempt for an unknown account',
+        ipAddress: ipAddress || null,
+        metadata: {
+          email: dto.email,
+        },
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
     if (user.lockedUntil && user.lockedUntil > new Date()) {
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.login.locked',
+        severity: 'warning',
+        message: 'A locked account attempted to sign in',
+        userId: user.id,
+        ipAddress: ipAddress || null,
+      });
       throw new ForbiddenException('Account is temporarily locked');
     }
 
     if (user.isBanned && (!user.bannedUntil || user.bannedUntil > new Date())) {
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.login.banned',
+        severity: 'warning',
+        message: 'A banned account attempted to sign in',
+        userId: user.id,
+        ipAddress: ipAddress || null,
+      });
       throw new ForbiddenException('Account has been suspended');
     }
 
@@ -88,6 +111,15 @@ export class AuthService {
         user.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60_000);
       }
       this.data.save();
+      this.monitoring.recordSecurityEvent({
+        type: user.lockedUntil ? 'auth.login.locked' : 'auth.login.failed',
+        severity: 'warning',
+        message: user.lockedUntil
+          ? 'An account was locked after repeated failed logins'
+          : 'A user supplied invalid credentials',
+        userId: user.id,
+        ipAddress: ipAddress || null,
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -99,6 +131,13 @@ export class AuthService {
     const accessToken = await this.signAccessToken(user);
     const refreshToken = this.issueRefreshToken(user.id, ipAddress, userAgent);
     this.data.save();
+    this.monitoring.recordSecurityEvent({
+      type: 'auth.login.succeeded',
+      severity: 'info',
+      message: 'A user signed in successfully',
+      userId: user.id,
+      ipAddress: ipAddress || null,
+    });
 
     return {
       user: this.toPublicUser(user),
@@ -110,25 +149,104 @@ export class AuthService {
   async refresh(rawToken: string, ipAddress: string, userAgent: string) {
     // Refresh tokens are rotated every time to reduce the value of a leaked token.
     if (!rawToken) {
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.refresh.missing',
+        severity: 'warning',
+        message: 'A refresh request arrived without a refresh token',
+        ipAddress: ipAddress || null,
+      });
       throw new UnauthorizedException('No refresh token');
     }
 
     const tokenHash = this.hashToken(rawToken);
     const stored = this.data.refreshTokens.find((entry) => entry.tokenHash === tokenHash) ?? null;
 
-    if (!stored || stored.revokedAt || stored.expiresAt <= new Date()) {
+    if (stored?.revokedAt) {
+      this.revokeActiveSessionsForUser(stored.userId);
+      this.data.save();
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.refresh.reuse_detected',
+        severity: 'critical',
+        message: 'A revoked refresh token was presented again',
+        userId: stored.userId,
+        ipAddress: ipAddress || null,
+      });
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (!stored || stored.expiresAt <= new Date()) {
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.refresh.failed',
+        severity: 'warning',
+        message: 'An invalid or expired refresh token was rejected',
+        ipAddress: ipAddress || null,
+      });
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
     const user = this.data.findUserById(stored.userId);
     if (!user) {
+      stored.revokedAt = new Date();
+      this.data.save();
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.refresh.orphaned',
+        severity: 'warning',
+        message: 'A refresh token referenced a missing user',
+        ipAddress: ipAddress || null,
+      });
       throw new UnauthorizedException('User not found');
+    }
+
+    if (stored.userAgent && userAgent && stored.userAgent !== userAgent) {
+      stored.revokedAt = new Date();
+      this.data.save();
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.refresh.user_agent_mismatch',
+        severity: 'critical',
+        message: 'A refresh token was presented from a different user agent',
+        userId: user.id,
+        ipAddress: ipAddress || null,
+      });
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (user.isBanned && (!user.bannedUntil || user.bannedUntil > new Date())) {
+      this.revokeActiveSessionsForUser(user.id);
+      this.data.save();
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.refresh.banned',
+        severity: 'warning',
+        message: 'A banned user attempted to refresh a session',
+        userId: user.id,
+        ipAddress: ipAddress || null,
+      });
+      throw new ForbiddenException('Account has been suspended');
+    }
+
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      this.revokeActiveSessionsForUser(user.id);
+      this.data.save();
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.refresh.locked',
+        severity: 'warning',
+        message: 'A locked user attempted to refresh a session',
+        userId: user.id,
+        ipAddress: ipAddress || null,
+      });
+      throw new ForbiddenException('Account is temporarily locked');
     }
 
     stored.revokedAt = new Date();
     const accessToken = await this.signAccessToken(user);
     const refreshToken = this.issueRefreshToken(user.id, ipAddress, userAgent);
     this.data.save();
+    this.monitoring.recordSecurityEvent({
+      type: 'auth.refresh.succeeded',
+      severity: 'info',
+      message: 'A refresh token was rotated successfully',
+      userId: user.id,
+      ipAddress: ipAddress || null,
+    });
 
     return { accessToken, refreshToken };
   }
@@ -144,6 +262,12 @@ export class AuthService {
     if (stored) {
       stored.revokedAt = new Date();
       this.data.save();
+      this.monitoring.recordSecurityEvent({
+        type: 'auth.logout',
+        severity: 'info',
+        message: 'A refresh session was explicitly logged out',
+        userId: stored.userId,
+      });
     }
   }
 
@@ -171,9 +295,16 @@ export class AuthService {
       message: 'If that email exists, a reset link has been sent',
     };
 
-    if (this.config.get('NODE_ENV', 'development') !== 'production') {
+    if (this.config.get<string>('NODE_ENV', 'development') !== 'production') {
       response.debugToken = token;
     }
+
+    this.monitoring.recordSecurityEvent({
+      type: 'auth.password_reset.requested',
+      severity: 'info',
+      message: 'A password reset request was accepted',
+      userId: user.id,
+    });
 
     return response;
   }
@@ -198,12 +329,14 @@ export class AuthService {
     user.updatedAt = new Date();
     record.usedAt = new Date();
 
-    this.data.refreshTokens
-      .filter((token) => token.userId === user.id && !token.revokedAt)
-      .forEach((token) => {
-        token.revokedAt = new Date();
-      });
+    this.revokeActiveSessionsForUser(user.id);
     this.data.save();
+    this.monitoring.recordSecurityEvent({
+      type: 'auth.password_reset.completed',
+      severity: 'warning',
+      message: 'A password was reset and all active sessions were revoked',
+      userId: user.id,
+    });
 
     return { message: 'Password updated successfully' };
   }
@@ -217,11 +350,19 @@ export class AuthService {
     return this.toPublicUser(user);
   }
 
+  getRefreshTokenTtlMs() {
+    return this.config.getOrThrow<number>('REFRESH_TOKEN_TTL_HOURS') * 60 * 60 * 1000;
+  }
+
   private async signAccessToken(user: UserRecord) {
     // Access tokens stay short-lived and simple; refresh rotation handles continuity.
     return this.jwt.signAsync(
       { sub: user.id, role: user.role },
-      { expiresIn: `${ACCESS_TOKEN_MINUTES}m` },
+      {
+        expiresIn: `${this.config.getOrThrow<number>('ACCESS_TOKEN_TTL_MINUTES')}m`,
+        issuer: this.config.getOrThrow<string>('JWT_ISSUER'),
+        audience: this.config.getOrThrow<string>('JWT_AUDIENCE'),
+      },
     );
   }
 
@@ -234,7 +375,7 @@ export class AuthService {
       tokenHash: this.hashToken(rawToken),
       ipAddress: ipAddress || null,
       userAgent: userAgent || null,
-      expiresAt: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + this.getRefreshTokenTtlMs()),
       revokedAt: null,
       createdAt: new Date(),
     };
@@ -246,6 +387,14 @@ export class AuthService {
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private revokeActiveSessionsForUser(userId: string) {
+    this.data.refreshTokens
+      .filter((token) => token.userId === userId && !token.revokedAt)
+      .forEach((token) => {
+        token.revokedAt = new Date();
+      });
   }
 
   private toPublicUser(user: UserRecord) {
