@@ -17,21 +17,38 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="border-b" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+    <header
+      className="sticky top-0 z-30 border-b backdrop-blur"
+      style={{
+        borderColor: 'var(--border)',
+        background: 'color-mix(in oklch, var(--bg-surface) 88%, transparent)',
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>
-            AniRate
-          </span>
+        <Link href="/" className="flex items-center gap-3 min-w-0">
           <span
-            className="text-sm px-2 py-0.5 rounded-full"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-3)' }}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-sm font-black"
+            style={{
+              background: 'linear-gradient(135deg, var(--accent), var(--accent-alt))',
+              color: 'var(--bg-base)',
+            }}
           >
-            Sub vs Dub
+            AR
+          </span>
+          <span className="min-w-0">
+            <span className="block text-xl font-black leading-5" style={{ color: 'var(--text-1)' }}>
+              AniRate
+            </span>
+            <span className="block text-xs uppercase tracking-[0.18em]" style={{ color: 'var(--text-3)' }}>
+              sub/dub database
+            </span>
           </span>
         </Link>
 
         <nav className="flex items-center gap-3">
+          <Link href="/catalog/search?sort=rating" className="btn-ghost text-sm hidden sm:inline-flex">
+            Rankings
+          </Link>
           {user ? (
             <>
               <span className="text-sm" style={{ color: 'var(--text-2)' }}>

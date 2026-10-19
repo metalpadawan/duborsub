@@ -3,7 +3,7 @@
 // the browser cookie managed by the backend.
 
 import { create } from 'zustand';
-import { authApi, tokenStore, User } from './api';
+import { authApi, refreshAccessToken, tokenStore, User } from './api';
 
 interface AuthState {
   user: User | null;
@@ -43,8 +43,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       // On a hard refresh we no longer have the in-memory access token, so we
       // first ask the backend to rotate the refresh cookie into a new token.
-      const { data: refreshData } = await authApi.refresh();
-      tokenStore.set(refreshData.accessToken);
+      // This shares the API client's single-flight refresh so it never races the interceptor.
+      await refreshAccessToken();
 
       // Once a fresh token exists, we can safely ask for the current user.
       const { data: user } = await authApi.me();

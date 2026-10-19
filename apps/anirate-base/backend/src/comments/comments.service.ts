@@ -52,6 +52,12 @@ export class CommentsService {
       if (parent.isDeleted) {
         throw new BadRequestException('You cannot reply to a deleted comment');
       }
+
+      // Threads are one level deep: list() only returns replies to top-level
+      // comments, so a reply to a reply would be stored but never shown.
+      if (parent.parentId !== null) {
+        throw new BadRequestException('Reply to the top-level comment instead of another reply');
+      }
     }
 
     const created = {

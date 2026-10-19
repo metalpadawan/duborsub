@@ -1,0 +1,96 @@
+import type { Anime } from './api';
+
+export const genreOptions = ['All', 'Action', 'Adventure', 'Drama', 'Fantasy', 'Mystery', 'Sci-Fi'];
+
+export const catalogItems: Anime[] = [
+  {
+    id: 'ff0c8c69-b21f-4dfa-a22b-1bfba63c20e3',
+    title: 'Skyline Ronin',
+    coverImageUrl: null,
+    releaseYear: 2024,
+    status: 'airing',
+    hasDub: true,
+    avgSubRating: 4.5,
+    avgDubRating: 4,
+    totalVotes: 2,
+    genres: [
+      { id: 1, name: 'Action' },
+      { id: 2, name: 'Adventure' },
+    ],
+  },
+  {
+    id: '00955f2a-9ded-443c-ae93-6eb7e6e987ec',
+    title: 'Neon Tide',
+    coverImageUrl: null,
+    releaseYear: 2023,
+    status: 'completed',
+    hasDub: true,
+    avgSubRating: 4,
+    avgDubRating: 5,
+    totalVotes: 1,
+    genres: [
+      { id: 1, name: 'Action' },
+      { id: 6, name: 'Sci-Fi' },
+    ],
+  },
+  {
+    id: 'ce094da3-7f20-4b11-aa7e-d9540691520d',
+    title: 'Paper Lantern Winter',
+    coverImageUrl: null,
+    releaseYear: 2022,
+    status: 'completed',
+    hasDub: false,
+    avgSubRating: 5,
+    avgDubRating: null,
+    totalVotes: 1,
+    genres: [
+      { id: 3, name: 'Drama' },
+      { id: 4, name: 'Fantasy' },
+    ],
+  },
+  {
+    id: '665c3d83-1862-4d22-bd19-a3a69c3720f5',
+    title: 'Signal Bloom',
+    coverImageUrl: null,
+    releaseYear: 2025,
+    status: 'upcoming',
+    hasDub: true,
+    avgSubRating: null,
+    avgDubRating: null,
+    totalVotes: 0,
+    genres: [
+      { id: 5, name: 'Mystery' },
+      { id: 6, name: 'Sci-Fi' },
+    ],
+  },
+  {
+    id: 'aeae9dd3-554e-47bf-9bb7-297566662dd1',
+    title: 'Crimson Relay',
+    coverImageUrl: null,
+    releaseYear: 2021,
+    status: 'completed',
+    hasDub: true,
+    avgSubRating: 4,
+    avgDubRating: 3,
+    totalVotes: 1,
+    genres: [
+      { id: 1, name: 'Action' },
+      { id: 3, name: 'Drama' },
+    ],
+  },
+  {
+    id: 'a9a18938-2963-46ba-ae87-6bfabdd1ecb8',
+    title: 'Moonlit Atelier',
+    coverImageUrl: null,
+    releaseYear: 2020,
+    status: 'completed',
+    hasDub: false,
+    avgSubRating: null,
+    avgDubRating: null,
+    totalVotes: 0,
+    genres: [
+      { id: 3, name: 'Drama' },
+      { id: 5, name: 'Mystery' },
+    ],
+  },
+];

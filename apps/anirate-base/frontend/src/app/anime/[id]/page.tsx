@@ -7,12 +7,21 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SiteHeader } from '@/components/SiteHeader';
+import { Providers } from '@/app/providers';
 import { animeApi, commentsApi, ratingsApi } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth.store';
 
 export default function AnimeDetailPage() {
+  return (
+    <Providers>
+      <AnimeDetailContent />
+    </Providers>
+  );
+}
+
+function AnimeDetailContent() {
   const params = useParams<{ id: string }>();
-  const animeId = params.id;
+  const animeId = params?.id ?? '';
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [commentText, setCommentText] = useState('');
@@ -84,59 +93,108 @@ export default function AnimeDetailPage() {
 
   const anime = animeQuery.data;
   if (!anime) {
+    // Only a 404 means the anime is missing; anything else is a failed request and
+    // should not be reported as "not found".
+    const status = (animeQuery.error as { response?: { status?: number } } | null)?.response?.status;
+    const message =
+      !animeQuery.error || status === 404
+        ? 'Anime not found.'
+        : 'Could not load this anime right now. Please try again shortly.';
+
     return (
       <main className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
         <SiteHeader />
         <div className="max-w-5xl mx-auto px-4 py-10" style={{ color: 'var(--text-3)' }}>
-          Anime not found.
+          {message}
         </div>
       </main>
     );
   }
+  const subAvg = anime.avgSubRating ? anime.avgSubRating.toFixed(1) : '-';
+  const dubAvg = anime.avgDubRating ? anime.avgDubRating.toFixed(1) : '-';
+  const scoreGap =
+    anime.avgSubRating && anime.avgDubRating ? (Number(anime.avgDubRating) - Number(anime.avgSubRating)).toFixed(1) : null;
 
   return (
-    <main className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
+    <main
+      className="min-h-screen"
+      style={{
+        background:
+          'radial-gradient(circle at 10% 0%, color-mix(in oklch, var(--accent-alt) 20%, transparent), transparent 26rem), var(--bg-base)',
+      }}
+    >
       <SiteHeader />
 
-      <section className="max-w-5xl mx-auto px-4 py-8">
-        <Link href="/" className="text-sm" style={{ color: 'var(--text-3)' }}>
-          Back to catalog
+      <section className="max-w-7xl mx-auto px-4 py-8">
+        <Link href="/" className="inline-flex min-h-11 items-center text-sm font-semibold" style={{ color: 'var(--text-3)' }}>
+          Back to database
         </Link>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_360px]">
           <div>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {anime.genres.map((genre) => (
-                <span
-                  key={genre.id}
-                  className="text-xs px-2 py-1 rounded-full"
-                  style={{ background: 'var(--bg-hover)', color: 'var(--text-2)', border: '1px solid var(--border)' }}
-                >
-                  {genre.name}
-                </span>
-              ))}
+            <div className="card overflow-hidden">
+              <div
+                className="p-5 sm:p-7"
+                style={{
+                  background:
+                    'linear-gradient(135deg, color-mix(in oklch, var(--accent-alt) 18%, transparent), transparent 42%), var(--bg-card)',
+                }}
+              >
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {anime.genres.map((genre) => (
+                    <span
+                      key={genre.id}
+                      className="rounded-full px-3 py-1 text-xs font-bold"
+                      style={{
+                        background: 'color-mix(in oklch, var(--accent) 12%, var(--bg-hover))',
+                        color: 'var(--accent)',
+                        border: '1px solid color-mix(in oklch, var(--accent) 46%, var(--border))',
+                      }}
+                    >
+                      {genre.name}
+                    </span>
+                  ))}
+                </div>
+
+                <p className="data-label">Anime report</p>
+                <h1 className="mt-2 text-5xl font-black tracking-[-0.045em] sm:text-6xl" style={{ color: 'var(--text-1)' }}>
+                  {anime.title}
+                </h1>
+                <p className="mt-4 max-w-3xl text-base leading-7" style={{ color: 'var(--text-2)' }}>
+                  {anime.description || 'No description yet.'}
+                </p>
+              </div>
             </div>
 
-            <h1 className="text-4xl font-semibold" style={{ color: 'var(--text-1)' }}>
-              {anime.title}
-            </h1>
-            <p className="text-sm mt-3 max-w-3xl" style={{ color: 'var(--text-2)' }}>
-              {anime.description || 'No description yet.'}
-            </p>
-
-            <div className="grid sm:grid-cols-3 gap-4 mt-8">
-              <StatCard label="Sub Avg" value={anime.avgSubRating ? anime.avgSubRating.toFixed(1) : '-'} />
-              <StatCard label="Dub Avg" value={anime.avgDubRating ? anime.avgDubRating.toFixed(1) : '-'} />
+            <div className="grid sm:grid-cols-4 gap-3 mt-5">
+              <StatCard label="Sub Avg" value={subAvg} />
+              <StatCard label="Dub Avg" value={dubAvg} />
+              <StatCard label="Gap" value={scoreGap ? `${Number(scoreGap) > 0 ? '+' : ''}${scoreGap}` : '-'} />
               <StatCard label="Votes" value={String(anime.totalVotes)} />
             </div>
 
             <div className="card p-5 mt-8">
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--text-1)' }}>
-                Rate This Series
-              </h2>
-              <p className="text-sm mt-1" style={{ color: 'var(--text-3)' }}>
-                Use the buttons below to rate the sub and dub separately.
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="data-label">Community input</p>
+                  <h2 className="mt-1 text-xl font-black" style={{ color: 'var(--text-1)' }}>
+                    Rate the version
+                  </h2>
+                  <p className="text-sm mt-1" style={{ color: 'var(--text-3)' }}>
+                    Split ratings make the sub/dub comparison useful instead of averaging away the difference.
+                  </p>
+                </div>
+                <span
+                  className="rounded-lg px-3 py-2 text-xs font-black"
+                  style={{
+                    background: anime.hasDub ? 'color-mix(in oklch, var(--accent) 14%, transparent)' : 'var(--bg-hover)',
+                    color: anime.hasDub ? 'var(--accent)' : 'var(--text-3)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  {anime.hasDub ? 'SUB/DUB READY' : 'SUB ONLY'}
+                </span>
+              </div>
 
               {user ? (
                 // Ratings stay split so sub and dub opinions can diverge naturally.
@@ -165,31 +223,37 @@ export default function AnimeDetailPage() {
             </div>
           </div>
 
-          <aside className="card p-5 h-fit">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-1)' }}>
+          <aside className="card h-fit p-5 lg:sticky lg:top-24">
+            <p className="data-label">Scouting panel</p>
+            <h2 className="mt-1 text-lg font-black" style={{ color: 'var(--text-1)' }}>
               Details
             </h2>
-            <dl className="mt-4 space-y-3 text-sm">
-              <div>
-                <dt style={{ color: 'var(--text-3)' }}>Status</dt>
-                <dd style={{ color: 'var(--text-1)' }}>{anime.status}</dd>
-              </div>
-              <div>
-                <dt style={{ color: 'var(--text-3)' }}>Year</dt>
-                <dd style={{ color: 'var(--text-1)' }}>{anime.releaseYear ?? '-'}</dd>
-              </div>
-              <div>
-                <dt style={{ color: 'var(--text-3)' }}>Dub Available</dt>
-                <dd style={{ color: 'var(--text-1)' }}>{anime.hasDub ? 'Yes' : 'No'}</dd>
-              </div>
+            <dl className="mt-4 grid gap-3 text-sm">
+              <DetailRow label="Status" value={anime.status} />
+              <DetailRow label="Year" value={String(anime.releaseYear ?? '-')} />
+              <DetailRow label="Dub available" value={anime.hasDub ? 'Yes' : 'No'} />
+              <DetailRow label="Community votes" value={String(anime.totalVotes)} />
             </dl>
+            <div className="mt-5 rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+              <p className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-3)' }}>
+                Read recommendation
+              </p>
+              <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-2)' }}>
+                {scoreGap
+                  ? Number(scoreGap) > 0
+                    ? 'Dub score is currently ahead. Check comments before choosing.'
+                    : 'Sub score is currently ahead. Dub may still be useful for casual watching.'
+                  : 'Not enough split-score data yet. Add your rating to improve the report.'}
+              </p>
+            </div>
           </aside>
         </div>
       </section>
 
-      <section className="max-w-5xl mx-auto px-4 pb-12">
+      <section className="max-w-7xl mx-auto px-4 pb-12">
         <div className="card p-5">
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-1)' }}>
+          <p className="data-label">Community notes</p>
+          <h2 className="mt-1 text-xl font-black" style={{ color: 'var(--text-1)' }}>
             Discussion
           </h2>
 
@@ -223,7 +287,7 @@ export default function AnimeDetailPage() {
 
           <div className="mt-6 space-y-4">
             {commentsQuery.data?.items.map((comment) => (
-              <article key={comment.id} className="card p-4">
+              <article key={comment.id} className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>
@@ -242,7 +306,7 @@ export default function AnimeDetailPage() {
                   {comment.content}
                 </p>
 
-                {user?.id === comment.user?.id ? (
+                {user && comment.user && user.id === comment.user.id ? (
                   <div className="flex justify-end mt-3">
                     <button
                       className="text-xs"
@@ -281,12 +345,28 @@ export default function AnimeDetailPage() {
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="card p-4">
-      <p className="text-xs uppercase tracking-[0.2em]" style={{ color: 'var(--text-3)' }}>
+      <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--text-3)' }}>
         {label}
       </p>
-      <p className="text-3xl font-semibold mt-2" style={{ color: 'var(--text-1)' }}>
+      <p className="mt-2 text-3xl font-black leading-none" style={{ color: 'var(--text-1)' }}>
         {value}
       </p>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      className="flex items-center justify-between gap-4 rounded-lg border px-3 py-3"
+      style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}
+    >
+      <dt className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-3)' }}>
+        {label}
+      </dt>
+      <dd className="text-sm font-black" style={{ color: 'var(--text-1)' }}>
+        {value}
+      </dd>
     </div>
   );
 }
@@ -302,21 +382,23 @@ function RatingPanel({
 }) {
   return (
     <div className="card p-4">
-      <p className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>
-        {label}
-      </p>
-      <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>
-        Current rating: {currentValue ?? '-'}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-black" style={{ color: 'var(--text-1)' }}>
+          {label}
+        </p>
+        <p className="rounded-md px-2 py-1 text-xs font-black" style={{ background: 'var(--bg-hover)', color: 'var(--text-2)' }}>
+          {currentValue ?? '-'} / 5
+        </p>
+      </div>
       {/* The selected value is highlighted so a returning user can see their current vote at a glance. */}
-      <div className="flex gap-2 mt-4">
+      <div className="grid grid-cols-5 gap-2 mt-4">
         {[1, 2, 3, 4, 5].map((value) => (
           <button
             key={value}
-            className="w-10 h-10 rounded-lg text-sm font-medium"
+            className="min-h-11 rounded-lg text-sm font-black transition-transform active:scale-95"
             style={{
               background: currentValue === value ? 'var(--accent)' : 'var(--bg-hover)',
-              color: currentValue === value ? '#fff' : 'var(--text-2)',
+              color: currentValue === value ? 'var(--bg-base)' : 'var(--text-2)',
               border: '1px solid var(--border)',
             }}
             onClick={() => onRate(value)}

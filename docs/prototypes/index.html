@@ -1,0 +1,412 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AniRate Prototypes</title>
+  <style>
+    :root {
+      --bg: oklch(14% 0.03 255);
+      --surface: oklch(19% 0.035 255);
+      --surface-2: oklch(23% 0.04 255);
+      --fg: oklch(96% 0.01 245);
+      --muted: oklch(72% 0.025 250);
+      --border: oklch(32% 0.04 255);
+      --accent: oklch(72% 0.17 156);
+      --accent-2: oklch(69% 0.19 252);
+      --warn: oklch(77% 0.16 76);
+      --danger: oklch(67% 0.18 25);
+      --font-display: "Aptos Display", "Segoe UI", system-ui, sans-serif;
+      --font-body: "Segoe UI", system-ui, sans-serif;
+      --font-mono: "Cascadia Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--fg);
+      background:
+        radial-gradient(circle at 20% 0%, color-mix(in oklch, var(--accent-2) 22%, transparent) 0, transparent 28rem),
+        linear-gradient(135deg, oklch(10% 0.03 255), var(--bg) 56%, oklch(11% 0.03 178));
+      font-family: var(--font-body);
+    }
+    a { color: inherit; text-decoration: none; }
+    .shell {
+      width: min(1440px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 12px 0 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: .01em;
+    }
+    .mark {
+      width: 38px;
+      height: 38px;
+      border: 1px solid color-mix(in oklch, var(--accent) 60%, var(--border));
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: var(--bg);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      font-family: var(--font-mono);
+      box-shadow: 0 18px 50px color-mix(in oklch, var(--accent) 22%, transparent);
+    }
+    .nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .nav a {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 9px 12px;
+      background: color-mix(in oklch, var(--surface) 75%, transparent);
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+      gap: 28px;
+      align-items: stretch;
+      min-height: 620px;
+    }
+    .hero-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: clamp(24px, 4vw, 56px) 0;
+    }
+    .kicker {
+      color: var(--accent);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: .14em;
+      margin-bottom: 18px;
+    }
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(48px, 7vw, 104px);
+      line-height: .92;
+      letter-spacing: 0;
+      margin: 0 0 22px;
+      max-width: 10ch;
+    }
+    .lede {
+      color: var(--muted);
+      font-size: clamp(18px, 2vw, 24px);
+      line-height: 1.5;
+      max-width: 660px;
+      margin: 0 0 30px;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .button {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      min-height: 46px;
+      padding: 12px 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 750;
+      background: var(--surface);
+    }
+    .button.primary {
+      border-color: color-mix(in oklch, var(--accent) 75%, var(--border));
+      background: var(--accent);
+      color: oklch(10% 0.03 255);
+    }
+    .preview {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: color-mix(in oklch, var(--surface) 86%, transparent);
+      padding: 18px;
+      box-shadow: 0 24px 80px rgb(0 0 0 / .28);
+      align-self: center;
+    }
+    .app-window {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: oklch(12% 0.03 255);
+    }
+    .window-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 42px;
+      padding: 0 14px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font: 12px var(--font-mono);
+    }
+    .dots { display: flex; gap: 6px; }
+    .dots span { width: 9px; height: 9px; border-radius: 999px; background: var(--border); }
+    .dash {
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      min-height: 430px;
+    }
+    .side {
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .side b { color: var(--fg); }
+    .side .active {
+      color: var(--bg);
+      background: var(--accent);
+      border-radius: 9px;
+      padding: 10px;
+      font-weight: 800;
+    }
+    .main {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+    .search {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+    input, select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--fg);
+      padding: 12px 13px;
+      font: inherit;
+    }
+    .score-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .metric, .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      padding: 14px;
+    }
+    .metric span { display: block; color: var(--muted); font-size: 12px; }
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      font: 800 24px var(--font-mono);
+      color: var(--fg);
+    }
+    .table {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1.4fr .7fr .6fr .8fr;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      font-size: 13px;
+    }
+    .row:last-child { border-bottom: 0; }
+    .row.head {
+      color: var(--muted);
+      font: 11px var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .pill {
+      justify-self: start;
+      border: 1px solid color-mix(in oklch, var(--accent) 60%, var(--border));
+      border-radius: 999px;
+      padding: 5px 8px;
+      color: var(--accent);
+      font: 11px var(--font-mono);
+      background: color-mix(in oklch, var(--accent) 10%, transparent);
+    }
+    .screens {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 28px;
+    }
+    .screen-card {
+      min-height: 190px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: color-mix(in oklch, var(--surface) 88%, transparent);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform .18s ease, border-color .18s ease;
+    }
+    .screen-card:hover {
+      transform: translateY(-3px);
+      border-color: color-mix(in oklch, var(--accent) 70%, var(--border));
+    }
+    .screen-card h2 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+    .screen-card p {
+      margin: 10px 0 18px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .screen-card span {
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .sources {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .sources a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+
+    @media (max-width: 980px) {
+      .hero { grid-template-columns: 1fr; min-height: auto; }
+      .screens { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 24px, 1440px); padding-top: 16px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .hero-copy { padding: 28px 0 8px; }
+      h1 { font-size: clamp(44px, 16vw, 64px); max-width: 9ch; }
+      .dash { grid-template-columns: 1fr; }
+      .side { display: none; }
+      .score-row { grid-template-columns: repeat(2, 1fr); }
+      .row { grid-template-columns: 1.2fr .7fr .6fr; }
+      .row > :nth-child(4) { display: none; }
+      .screens { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="index.html" aria-label="AniRate prototypes home">
+        <span class="mark">AR</span>
+        <span>AniRate</span>
+      </a>
+      <nav class="nav" aria-label="Prototype screens">
+        <a href="web-home.html">Responsive web</a>
+        <a href="desktop-database.html">Desktop database</a>
+        <a href="ios-app.html">iOS app</a>
+        <a href="android-app.html">Android app</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker">eFHUB26-inspired anime companion</div>
+        <h1>Database first. Fandom ready.</h1>
+        <p class="lede">A high-density anime companion prototype that borrows eFHUB26’s useful structure: searchable catalog, stat-rich profiles, comparison tools, saved builds, and community judgement.</p>
+        <div class="actions">
+          <a class="button primary" href="web-home.html">Open web prototype</a>
+          <a class="button" href="desktop-database.html">Review database</a>
+        </div>
+      </div>
+
+      <div class="preview" aria-label="Dashboard preview">
+        <div class="app-window">
+          <div class="window-bar">
+            <div class="dots"><span></span><span></span><span></span></div>
+            <span>anime-db / tactical view</span>
+          </div>
+          <div class="dash">
+            <aside class="side">
+              <b>Core hub</b>
+              <div class="active">Anime database</div>
+              <div>Compare titles</div>
+              <div>Watchlist builds</div>
+              <div>Community notes</div>
+              <div>Season radar</div>
+            </aside>
+            <section class="main">
+              <div class="search">
+                <input value="Search title, studio, trope, season" aria-label="Search preview">
+                <button class="button primary">Filter</button>
+              </div>
+              <div class="score-row">
+                <div class="metric"><span>Catalog</span><strong>1,284</strong></div>
+                <div class="metric"><span>Top score</span><strong>9.4</strong></div>
+                <div class="metric"><span>Saved</span><strong>36</strong></div>
+                <div class="metric"><span>Signals</span><strong>8</strong></div>
+              </div>
+              <div class="table">
+                <div class="row head"><span>Title</span><span>Score</span><span>Fit</span><span>Status</span></div>
+                <div class="row"><strong>Frieren</strong><span>9.4</span><span>98</span><span class="pill">watch next</span></div>
+                <div class="row"><strong>Jujutsu Kaisen</strong><span>8.7</span><span>91</span><span class="pill">compare</span></div>
+                <div class="row"><strong>Vinland Saga</strong><span>9.1</span><span>94</span><span class="pill">saved</span></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screens" aria-label="Screen files">
+      <a class="screen-card" href="web-home.html">
+        <div>
+          <h2>Responsive Web Hub</h2>
+          <p>Public anime fan surface with search, rankings, detail preview, and watchlist modules.</p>
+        </div>
+        <span>open screen</span>
+      </a>
+      <a class="screen-card" href="desktop-database.html">
+        <div>
+          <h2>Desktop Database</h2>
+          <p>Dense operator view with sortable rows, comparison tray, stat radar, and advanced filters.</p>
+        </div>
+        <span>open screen</span>
+      </a>
+      <a class="screen-card" href="ios-app.html">
+        <div>
+          <h2>iOS App Surface</h2>
+          <p>Native-feeling compact companion with bottom navigation, saved picks, and rating controls.</p>
+        </div>
+        <span>open screen</span>
+      </a>
+      <a class="screen-card" href="android-app.html">
+        <div>
+          <h2>Android App Surface</h2>
+          <p>Material-style mobile layout with search chips, FAB action, and stats-first title page.</p>
+        </div>
+        <span>open screen</span>
+      </a>
+    </section>
+
+    <p class="sources">Reference sources used for eFHUB26 patterns: <a href="https://mwm.ai/apps/efhub-26/1591724001">MWM app profile</a>, <a href="https://www.appbrain.com/appstore/efhub-25/ios-1591724001">AppBrain listing</a>, and <a href="https://apps.apple.com/sc/app/efhub-26/id1591724001">Apple App Store listing</a>.</p>
+  </main>
+</body>
+</html>

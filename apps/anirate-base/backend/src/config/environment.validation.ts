@@ -69,6 +69,10 @@ const environmentSchema = z.object({
   COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
   COOKIE_SECURE: z.preprocess(parseBoolean, z.boolean()).optional(),
   TRUST_PROXY: z.preprocess(parseBoolean, z.boolean()).default(false),
+  DATA_FILE: z.string().trim().min(1).optional(),
+  EXPOSE_RESET_TOKEN:z.preprocess(parseBoolean, z.boolean()).default(false),
+  SEED_ADMIN_EMAIL: z.string().trim().email().optional(),
+  SEED_ADMIN_PASSWORD: z.string().min(12, 'SEED_ADMIN_PASSWORD must be at least 12 characters long').optional(),
 });
 
 export function validateEnvironment(config: Record<string, unknown>) {
@@ -84,6 +88,10 @@ export function validateEnvironment(config: Record<string, unknown>) {
     !isLocalUrl(parsed.FRONTEND_URL)
   ) {
     throw new Error('FRONTEND_URL must use HTTPS unless it points to localhost');
+  }
+
+  if (parsed.NODE_ENV === 'production' && parsed.EXPOSE_RESET_TOKEN) {
+    throw new Error('EXPOSE_RESET_TOKEN must not be enabled in production');
   }
 
   if (parsed.COOKIE_SAME_SITE === 'none' && !cookieSecure) {

@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { ParseResourceIdPipe } from '../common/pipes/parse-resource-id.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -37,7 +38,7 @@ export class AdminController {
 
   @Post('users/:id/ban')
   banUser(
-    @Param('id', ParseUUIDPipe) userId: string,
+    @Param('id', ParseResourceIdPipe) userId: string,
     @CurrentUser() admin: { id: string },
     @Body() dto: BanUserDto,
     @Req() req: Request,
@@ -47,7 +48,7 @@ export class AdminController {
 
   @Post('users/:id/unban')
   unbanUser(
-    @Param('id', ParseUUIDPipe) userId: string,
+    @Param('id', ParseResourceIdPipe) userId: string,
     @CurrentUser() admin: { id: string },
     @Req() req: Request,
   ) {

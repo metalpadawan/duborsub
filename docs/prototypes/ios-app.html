@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AniRate Prototype - iOS</title>
+  <style>
+    :root{--bg:oklch(14% .03 255);--surface:oklch(19% .035 255);--surface-2:oklch(23% .04 255);--fg:oklch(96% .01 245);--muted:oklch(72% .025 250);--border:oklch(32% .04 255);--accent:oklch(72% .17 156);--accent-2:oklch(69% .19 252);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 0,color-mix(in oklch,var(--accent-2) 25%,transparent),transparent 30rem),oklch(10% .03 255);color:var(--fg)}.phone{width:min(390px,100vw);height:min(844px,100vh);border:10px solid #05070b;border-radius:48px;background:var(--bg);overflow:hidden;position:relative;box-shadow:0 30px 80px rgb(0 0 0/.45)}.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:126px;height:36px;background:#020306;border-radius:999px;z-index:3}.screen{height:100%;padding:58px 16px 88px;overflow:auto}.top{display:flex;justify-content:space-between;align-items:center}.top small{color:var(--muted)}h1{font-size:32px;line-height:1;margin:8px 0 16px}.search{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:12px 14px;color:var(--muted);margin-bottom:14px}.chips{display:flex;gap:8px;overflow:auto;padding-bottom:12px}.chip{white-space:nowrap;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--muted);padding:9px 12px}.chip.active{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:800}.card{border:1px solid var(--border);border-radius:22px;background:var(--surface);padding:14px;margin-bottom:12px}.hero{min-height:210px;background:linear-gradient(145deg,var(--accent-2),oklch(22% .05 255));display:flex;flex-direction:column;justify-content:flex-end}.hero h2{font-size:30px;line-height:1;margin:0 0 8px}.meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font:12px ui-monospace,Menlo,monospace}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{border:1px solid var(--border);border-radius:16px;background:var(--surface-2);padding:11px;text-align:center}.stat small{display:block;color:var(--muted)}.stat b{display:block;font-size:22px;margin-top:4px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center}.save{width:100%;min-height:48px;border:0;border-radius:16px;background:var(--accent);color:var(--bg);font-weight:850;margin-top:12px}.tabbar{position:absolute;left:14px;right:14px;bottom:12px;height:64px;border:1px solid var(--border);border-radius:24px;background:color-mix(in oklch,var(--surface) 92%,transparent);backdrop-filter:blur(18px);display:grid;grid-template-columns:repeat(4,1fr);align-items:center}.tabbar button{border:0;background:transparent;color:var(--muted);font:12px inherit}.tabbar button.active{color:var(--accent);font-weight:800}.home{position:absolute;left:50%;bottom:5px;transform:translateX(-50%);width:128px;height:4px;border-radius:999px;background:#fff;opacity:.75}
+  </style>
+</head>
+<body>
+  <main class="phone" aria-label="iOS app prototype">
+    <div class="island"></div>
+    <section class="screen">
+      <div class="top"><div><small>Today’s build</small><h1>Anime Hub</h1></div><b>AR</b></div>
+      <div class="search">Search titles, arcs, studios</div>
+      <div class="chips"><button class="chip active">For you</button><button class="chip">Airing</button><button class="chip">Gems</button><button class="chip">Compare</button></div>
+      <article class="card hero"><div class="meta"><span>Fantasy</span><span>28 eps</span><span>98 fit</span></div><h2>Frieren</h2></article>
+      <div class="stats"><div class="stat"><small>Score</small><b>9.4</b></div><div class="stat"><small>Story</small><b>96</b></div><div class="stat"><small>Pace</small><b>88</b></div></div>
+      <article class="card"><div class="row"><div><b>Weekend queue</b><div class="meta"><span>6 episodes</span><span>2h 24m</span></div></div><span style="color:var(--accent)">Ready</span></div><button class="save" id="save">Save to My Team</button></article>
+      <article class="card"><div class="row"><div><b>Community build</b><div class="meta"><span>spoiler-safe watch order</span></div></div><b>842</b></div></article>
+    </section>
+    <nav class="tabbar"><button class="active">Hub</button><button>DB</button><button>Stats</button><button>Saved</button></nav><div class="home"></div>
+  </main>
+  <script>document.getElementById("save").addEventListener("click",e=>{e.currentTarget.textContent="Saved";e.currentTarget.style.background="var(--accent-2)"})</script>
+</body>
+</html>

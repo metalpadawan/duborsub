@@ -16,6 +16,7 @@ This repository is organized around one runnable AniRate application, three incr
 |   `-- schema.sql
 |-- docs/
 |   |-- git-workflow.md
+|   |-- prototypes/
 |   `-- repo-map.md
 `-- CONTRIBUTING.md
 ```
@@ -89,6 +90,7 @@ Demo accounts:
 - `CONTRIBUTING.md` explains the repo contribution workflow.
 - `docs/git-workflow.md` lists common Git commands and repo-specific guardrails.
 - `docs/repo-map.md` gives a fuller walkthrough of the repo structure.
+- `docs/prototypes/` holds static UI prototypes for web, desktop, iOS, and Android; open `docs/prototypes/index.html` in a browser.
 
 Important rule: edit maintained source files under `apps/anirate-base/backend/src` and `apps/anirate-base/frontend/src`, not generated output like `.next/`, `dist/`, or `node_modules/`.
 

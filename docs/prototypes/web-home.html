@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AniRate Prototype - Web</title>
+  <style>
+    :root{--bg:oklch(14% .03 255);--surface:oklch(19% .035 255);--surface-2:oklch(23% .04 255);--fg:oklch(96% .01 245);--muted:oklch(72% .025 250);--border:oklch(32% .04 255);--accent:oklch(72% .17 156);--accent-2:oklch(69% .19 252);--warn:oklch(77% .16 76);--danger:oklch(67% .18 25);--font-display:"Aptos Display","Segoe UI",system-ui,sans-serif;--font-body:"Segoe UI",system-ui,sans-serif;--font-mono:"Cascadia Mono","JetBrains Mono",ui-monospace,Menlo,monospace}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body)}a{color:inherit;text-decoration:none}button,input,select{font:inherit}
+    .app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}.rail{position:sticky;top:0;height:100vh;border-right:1px solid var(--border);background:oklch(12% .03 255);padding:22px 16px;display:flex;flex-direction:column;gap:18px}.brand{display:flex;align-items:center;gap:10px;font-weight:900}.mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:var(--bg);font:800 12px var(--font-mono)}.rail nav{display:grid;gap:6px}.rail a,.chip,.icon-btn{border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);padding:11px 12px}.rail a.active{background:var(--accent);color:var(--bg);font-weight:800;border-color:var(--accent)}
+    .content{padding:22px clamp(16px,3vw,38px) 42px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:22px}.searchbar{display:grid;grid-template-columns:1fr auto auto;gap:10px;flex:1;max-width:860px}.searchbar input,.searchbar select{border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:12px;padding:13px 14px}.primary{border:0;border-radius:12px;background:var(--accent);color:var(--bg);font-weight:850;padding:13px 16px;cursor:pointer}.ghost{border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--fg);padding:13px 16px;cursor:pointer}
+    .hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr);gap:18px}.panel{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:18px}.spotlight{min-height:360px;display:grid;grid-template-columns:1fr 220px;gap:18px;overflow:hidden;position:relative}.kicker{font:12px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}h1{font-family:var(--font-display);font-size:clamp(42px,5vw,76px);line-height:.95;letter-spacing:0;margin:14px 0}.lede{color:var(--muted);font-size:18px;line-height:1.5;max-width:680px}.poster{border:1px solid var(--border);border-radius:14px;background:linear-gradient(160deg,oklch(25% .08 255),oklch(18% .05 156));min-height:300px;padding:14px;display:flex;align-items:flex-end}.poster b{font-size:28px;line-height:1}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.metric{border:1px solid var(--border);border-radius:12px;background:var(--surface-2);padding:14px}.metric small{display:block;color:var(--muted)}.metric strong{display:block;margin-top:6px;font:850 26px var(--font-mono)}
+    .module-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.module-title h2{margin:0;font-size:19px}.tabs{display:flex;gap:8px;flex-wrap:wrap}.tab{border:1px solid var(--border);background:var(--surface-2);color:var(--muted);border-radius:999px;padding:8px 10px;cursor:pointer}.tab[aria-selected=true]{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:800}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.anime-card{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:14px;display:grid;gap:12px}.thumb{height:120px;border-radius:10px;border:1px solid var(--border);background:linear-gradient(135deg,var(--accent-2),oklch(22% .05 255));display:flex;align-items:end;padding:12px}.thumb strong{font-size:24px;line-height:1}.meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font:12px var(--font-mono)}.bar{height:8px;border-radius:999px;background:oklch(13% .03 255);overflow:hidden}.bar span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:inherit}.table{overflow:auto;border:1px solid var(--border);border-radius:14px}.row{min-width:720px;display:grid;grid-template-columns:1.4fr .55fr .7fr .75fr .75fr auto;gap:12px;padding:13px 14px;border-bottom:1px solid var(--border);align-items:center}.row:last-child{border-bottom:0}.row.head{color:var(--muted);font:11px var(--font-mono);text-transform:uppercase;letter-spacing:.08em}.pill{justify-self:start;border:1px solid color-mix(in oklch,var(--accent) 60%,var(--border));border-radius:999px;padding:5px 8px;color:var(--accent);font:11px var(--font-mono);background:color-mix(in oklch,var(--accent) 10%,transparent)}
+    .compare{display:grid;gap:12px}.compare-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.range{height:10px;border-radius:999px;background:oklch(13% .03 255);overflow:hidden}.range span{display:block;height:100%;background:var(--warn);border-radius:inherit}.mobile-nav{display:none}
+    @media(max-width:1100px){.app{grid-template-columns:1fr}.rail{display:none}.hero{grid-template-columns:1fr}.spotlight{grid-template-columns:1fr}.poster{min-height:210px}.grid{grid-template-columns:repeat(2,1fr)}.mobile-nav{position:fixed;left:12px;right:12px;bottom:12px;z-index:5;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;border:1px solid var(--border);border-radius:18px;background:color-mix(in oklch,var(--surface) 92%,transparent);padding:8px;backdrop-filter:blur(18px)}.mobile-nav a{text-align:center;color:var(--muted);font-size:12px;padding:8px}.content{padding-bottom:96px}}
+    @media(max-width:640px){.top{align-items:stretch;flex-direction:column}.searchbar{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}h1{font-size:44px}.panel{padding:14px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <a class="brand" href="index.html"><span class="mark">AR</span><span>AniRate</span></a>
+      <nav aria-label="Product navigation">
+        <a class="active" href="#hub">Hub</a><a href="#database">Database</a><a href="#compare">Compare</a><a href="#watchlist">Watchlist</a><a href="#community">Community</a>
+      </nav>
+    </aside>
+    <main class="content">
+      <header class="top">
+        <form class="searchbar" id="searchForm">
+          <input id="searchInput" placeholder="Search anime, studio, tag, season" aria-label="Search anime">
+          <select id="genreFilter" aria-label="Genre"><option>All genres</option><option>Action</option><option>Fantasy</option><option>Slice of life</option></select>
+          <button class="primary">Analyze</button>
+        </form>
+        <button class="ghost" id="saveButton">Save current view</button>
+      </header>
+      <section class="hero" id="hub">
+        <article class="panel spotlight">
+          <div><div class="kicker">Best match from your signals</div><h1>Frieren: Beyond Journey's End</h1><p class="lede">A calm fantasy benchmark with high writing, worldbuilding, and emotional-payoff scores. Built for viewers who want character progression over noise.</p><div class="stats"><div class="metric"><small>Rating</small><strong>9.4</strong></div><div class="metric"><small>Fit</small><strong>98</strong></div><div class="metric"><small>Episodes</small><strong>28</strong></div><div class="metric"><small>Status</small><strong>Done</strong></div></div></div>
+          <div class="poster"><b>Quiet fantasy<br>high craft</b></div>
+        </article>
+        <aside class="panel compare" id="compare">
+          <div class="module-title"><h2>Stat radar</h2><span class="pill">max level view</span></div>
+          <div class="compare-row"><span>Story</span><b>96</b></div><div class="range"><span style="width:96%"></span></div>
+          <div class="compare-row"><span>Animation</span><b>91</b></div><div class="range"><span style="width:91%"></span></div>
+          <div class="compare-row"><span>Pacing</span><b>88</b></div><div class="range"><span style="width:88%"></span></div>
+          <div class="compare-row"><span>Community heat</span><b>84</b></div><div class="range"><span style="width:84%"></span></div>
+        </aside>
+      </section>
+      <section class="panel" id="database" style="margin-top:18px">
+        <div class="module-title"><h2>Anime database</h2><div class="tabs" role="tablist"><button class="tab" aria-selected="true" data-filter="All">All</button><button class="tab" data-filter="Action">Action</button><button class="tab" data-filter="Fantasy">Fantasy</button><button class="tab" data-filter="Drama">Drama</button></div></div>
+        <div class="table" id="animeTable"></div>
+      </section>
+      <section class="grid" id="watchlist">
+        <article class="anime-card"><div class="thumb"><strong>Watchlist Builder</strong></div><div class="meta"><span>36 saved</span><span>7 airing</span></div><p class="lede" style="font-size:15px;margin:0">Plan a week by episode length, mood, and completion risk.</p><button class="primary" id="autoBuild">Auto-build weekend queue</button></article>
+        <article class="anime-card"><div class="thumb"><strong>Hidden Gems</strong></div><div class="meta"><span>low hype</span><span>high fit</span></div><p class="lede" style="font-size:15px;margin:0">Find under-watched titles with strong studio and review signals.</p><button class="ghost">Open finder</button></article>
+        <article class="anime-card" id="community"><div class="thumb"><strong>Community Notes</strong></div><div class="meta"><span>spoiler-safe</span><span>build votes</span></div><p class="lede" style="font-size:15px;margin:0">Rate arcs, vote on watch orders, and compare title builds.</p><button class="ghost">Read notes</button></article>
+      </section>
+    </main>
+  </div>
+  <nav class="mobile-nav" aria-label="Mobile product navigation"><a href="#hub">Hub</a><a href="#database">DB</a><a href="#compare">Stats</a><a href="#watchlist">Saved</a></nav>
+  <script>
+    const titles=[["Frieren","Fantasy","9.4","98","Completed","watch next"],["Vinland Saga","Drama","9.1","94","Completed","saved"],["Jujutsu Kaisen","Action","8.7","91","Airing","compare"],["Dandadan","Action","8.5","89","Airing","hot"],["Apothecary Diaries","Drama","8.9","92","Airing","watch next"],["Dungeon Meshi","Fantasy","8.8","90","Completed","saved"]];
+    const table=document.getElementById("animeTable");
+    function render(filter="All",query=""){const rows=titles.filter(t=>(filter==="All"||t[1]===filter)&&t.join(" ").toLowerCase().includes(query.toLowerCase()));table.innerHTML='<div class="row head"><span>Title</span><span>Genre</span><span>Score</span><span>Fit</span><span>Status</span><span>Action</span></div>'+rows.map(t=>`<div class="row"><strong>${t[0]}</strong><span>${t[1]}</span><span>${t[2]}</span><span>${t[3]}</span><span>${t[4]}</span><button class="pill">${t[5]}</button></div>`).join("");}
+    render();
+    document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected","false"));btn.setAttribute("aria-selected","true");render(btn.dataset.filter,document.getElementById("searchInput").value)}));
+    document.getElementById("searchForm").addEventListener("submit",e=>{e.preventDefault();const active=document.querySelector(".tab[aria-selected=true]").dataset.filter;render(active,document.getElementById("searchInput").value)});
+    document.getElementById("saveButton").addEventListener("click",e=>{e.currentTarget.textContent="View saved";e.currentTarget.style.borderColor="var(--accent)"});
+    document.getElementById("autoBuild").addEventListener("click",e=>{e.currentTarget.textContent="Queue built: 6 episodes";});
+  </script>
+</body>
+</html>

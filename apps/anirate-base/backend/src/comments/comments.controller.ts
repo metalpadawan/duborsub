@@ -11,6 +11,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ParseResourceIdPipe } from '../common/pipes/parse-resource-id.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
@@ -26,14 +27,14 @@ export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
   @Get()
-  list(@Param('animeId', ParseUUIDPipe) animeId: string, @Query() query: CommentsQueryDto) {
+  list(@Param('animeId', ParseResourceIdPipe) animeId: string, @Query() query: CommentsQueryDto) {
     return this.commentsService.list(animeId, query);
   }
 
   @Post()
   @UseGuards(JwtAuthGuard)
   create(
-    @Param('animeId', ParseUUIDPipe) animeId: string,
+    @Param('animeId', ParseResourceIdPipe) animeId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: CreateCommentDto,
   ) {
@@ -43,7 +44,7 @@ export class CommentsController {
   @Patch(':commentId')
   @UseGuards(JwtAuthGuard)
   update(
-    @Param('animeId', ParseUUIDPipe) animeId: string,
+    @Param('animeId', ParseResourceIdPipe) animeId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateCommentDto,
@@ -54,7 +55,7 @@ export class CommentsController {
   @Delete(':commentId')
   @UseGuards(JwtAuthGuard)
   remove(
-    @Param('animeId', ParseUUIDPipe) animeId: string,
+    @Param('animeId', ParseResourceIdPipe) animeId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @CurrentUser() user: { id: string },
   ) {
@@ -64,7 +65,7 @@ export class CommentsController {
   @Post(':commentId/like')
   @UseGuards(JwtAuthGuard)
   like(
-    @Param('animeId', ParseUUIDPipe) animeId: string,
+    @Param('animeId', ParseResourceIdPipe) animeId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: VoteCommentDto,
@@ -75,7 +76,7 @@ export class CommentsController {
   @Delete(':commentId/like')
   @UseGuards(JwtAuthGuard)
   unlike(
-    @Param('animeId', ParseUUIDPipe) animeId: string,
+    @Param('animeId', ParseResourceIdPipe) animeId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @CurrentUser() user: { id: string },
   ) {

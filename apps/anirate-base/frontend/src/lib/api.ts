@@ -73,7 +73,9 @@ function shouldSkipAuthRefresh(config?: RetryableConfig) {
 }
 
 let accessToken: string | null = null;
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<string> | null = null;
+
+const CONCURRENT_REFRESH_RETRY_MS = 300;
 
 export const tokenStore = {
   get: () => accessToken,
@@ -117,30 +119,13 @@ api.interceptors.response.use(
 
     original._retry = true;
 
-    if (!refreshPromise) {
-      // Concurrent 401s should wait on one refresh request instead of stampeding the API.
-      refreshPromise = api
-        .post<{ accessToken: string }>('/auth/refresh', undefined, {
-          skipAuthRefresh: true,
-        } as RetryableConfig)
-        .then((response) => {
-          tokenStore.set(response.data.accessToken);
-          return response.data.accessToken;
-        })
-        .catch(() => {
-          tokenStore.clear();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-          }
-          return null;
-        })
-        .finally(() => {
-          refreshPromise = null;
-        });
-    }
-
-    const newToken = await refreshPromise;
-    if (!newToken) {
+    let newToken: string;
+    try {
+      newToken = await refreshAccessToken();
+    } catch {
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
       return Promise.reject(error);
     }
 
@@ -150,15 +135,48 @@ api.interceptors.response.use(
   },
 );
 
+function postRefresh() {
+  return api.post<{ accessToken: string }>('/auth/refresh', undefined, {
+    skipAuthRefresh: true,
+  } as RetryableConfig);
+}
+
+// Every refresh in this tab goes through one in-flight request. If another tab
+// rotated the cookie at the same moment, the server rejects our now-stale token
+// with a 401 without ending the session; by then the browser holds the new
+// cookie, so one short retry picks it up.
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = postRefresh()
+      .catch(async (error) => {
+        if (error?.response?.status !== 401) {
+          throw error;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, CONCURRENT_REFRESH_RETRY_MS));
+        return postRefresh();
+      })
+      .then((response) => {
+        tokenStore.set(response.data.accessToken);
+        return response.data.accessToken;
+      })
+      .catch((error) => {
+        tokenStore.clear();
+        throw error;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+}
+
 export const authApi = {
   register: (data: RegisterPayload) =>
     api.post('/auth/register', data, { skipAuthRefresh: true } as RetryableConfig),
   login: (data: LoginPayload) =>
     api.post<{ user: User; accessToken: string }>('/auth/login', data, {
-      skipAuthRefresh: true,
-    } as RetryableConfig),
-  refresh: () =>
-    api.post<{ accessToken: string }>('/auth/refresh', undefined, {
       skipAuthRefresh: true,
     } as RetryableConfig),
   logout: () => api.post('/auth/logout', undefined, { skipAuthRefresh: true } as RetryableConfig),

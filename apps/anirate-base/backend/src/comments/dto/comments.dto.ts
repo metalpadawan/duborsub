@@ -1,10 +1,10 @@
 // Comment DTOs describe create, edit, vote, and pagination payloads for discussions.
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
-import { SanitizePlainText } from '../../common/sanitization/sanitize.decorator';
+import { SanitizeMultilineText } from '../../common/sanitization/sanitize.decorator';
 
 export class CreateCommentDto {
-  @SanitizePlainText()
+  @SanitizeMultilineText()
   @IsString()
   @MinLength(1)
   @MaxLength(2000)
@@ -16,7 +16,7 @@ export class CreateCommentDto {
 }
 
 export class UpdateCommentDto {
-  @SanitizePlainText()
+  @SanitizeMultilineText()
   @IsString()
   @MinLength(1)
   @MaxLength(2000)

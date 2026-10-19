@@ -5,12 +5,12 @@ import {
   Delete,
   Get,
   Param,
-  ParseUUIDPipe,
   Patch,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ParseResourceIdPipe } from '../common/pipes/parse-resource-id.pipe';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -27,7 +27,7 @@ export class AnimeController {
   }
 
   @Get(':id')
-  getOne(@Param('id', ParseUUIDPipe) id: string) {
+  getOne(@Param('id', ParseResourceIdPipe) id: string) {
     return this.animeService.findOne(id);
   }
 
@@ -41,14 +41,14 @@ export class AnimeController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateAnimeDto) {
+  update(@Param('id', ParseResourceIdPipe) id: string, @Body() dto: UpdateAnimeDto) {
     return this.animeService.update(id, dto);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  remove(@Param('id', ParseResourceIdPipe) id: string) {
     return this.animeService.remove(id);
   }
 }

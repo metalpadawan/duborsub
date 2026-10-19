@@ -21,6 +21,16 @@ export function SanitizePlainText() {
   });
 }
 
+// User-written prose such as comments. It is stored as typed (minus control
+// characters) because every client renders it as text, never as HTML, so
+// stripping "<" would only mangle things like "a < b" or "<3".
+export function SanitizeMultilineText() {
+  return SanitizeString({
+    trim: true,
+    preserveNewlines: true,
+  });
+}
+
 export function SanitizeQueryText() {
   return SanitizeString({
     trim: true,

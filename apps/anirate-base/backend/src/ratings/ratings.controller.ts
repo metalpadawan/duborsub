@@ -5,10 +5,10 @@ import {
   Delete,
   Get,
   Param,
-  ParseUUIDPipe,
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ParseResourceIdPipe } from '../common/pipes/parse-resource-id.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UpsertRatingDto } from './dto/ratings.dto';
@@ -21,7 +21,7 @@ export class RatingsController {
   @Post()
   @UseGuards(JwtAuthGuard)
   upsert(
-    @Param('animeId', ParseUUIDPipe) animeId: string,
+    @Param('animeId', ParseResourceIdPipe) animeId: string,
     @CurrentUser() user: { id: string },
     @Body() dto: UpsertRatingDto,
   ) {
@@ -30,18 +30,18 @@ export class RatingsController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getMine(@Param('animeId', ParseUUIDPipe) animeId: string, @CurrentUser() user: { id: string }) {
+  getMine(@Param('animeId', ParseResourceIdPipe) animeId: string, @CurrentUser() user: { id: string }) {
     return this.ratingsService.getMine(user.id, animeId);
   }
 
   @Delete()
   @UseGuards(JwtAuthGuard)
-  remove(@Param('animeId', ParseUUIDPipe) animeId: string, @CurrentUser() user: { id: string }) {
+  remove(@Param('animeId', ParseResourceIdPipe) animeId: string, @CurrentUser() user: { id: string }) {
     return this.ratingsService.remove(user.id, animeId);
   }
 
   @Get('distribution')
-  getDistribution(@Param('animeId', ParseUUIDPipe) animeId: string) {
+  getDistribution(@Param('animeId', ParseResourceIdPipe) animeId: string) {
     return this.ratingsService.getDistribution(animeId);
   }
 }

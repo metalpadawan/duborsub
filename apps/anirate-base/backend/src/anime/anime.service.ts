@@ -1,7 +1,8 @@
 // AnimeService centralizes catalog reads and admin mutations for anime records.
 // It also enriches raw anime records with derived rating statistics for the UI.
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { removeWhere } from '../common/collections/remove-where';
 import { DataService } from '../data/data.service';
 import { AnimeQueryDto, CreateAnimeDto, UpdateAnimeDto } from './dto/anime.dto';
 
@@ -126,21 +127,20 @@ export class AnimeService {
   }
 
   remove(id: string) {
-    // Removing an anime also clears dependent ratings so derived stats stay coherent.
+    // Removing an anime also clears its ratings, comments, and comment votes so no
+    // orphaned records stay behind in the datastore.
     const index = this.data.anime.findIndex((anime) => anime.id === id);
     if (index === -1) {
       throw new NotFoundException('Anime not found');
     }
 
     this.data.anime.splice(index, 1);
-    this.data.ratings
-      .filter((rating) => rating.animeId === id)
-      .forEach((rating) => {
-        const ratingIndex = this.data.ratings.indexOf(rating);
-        if (ratingIndex >= 0) {
-          this.data.ratings.splice(ratingIndex, 1);
-        }
-      });
+    const commentIds = new Set(
+      this.data.comments.filter((comment) => comment.animeId === id).map((comment) => comment.id),
+    );
+    removeWhere(this.data.ratings, (rating) => rating.animeId === id);
+    removeWhere(this.data.comments, (comment) => commentIds.has(comment.id));
+    removeWhere(this.data.commentLikes, (like) => commentIds.has(like.commentId));
 
     this.data.save();
     return { message: 'Anime deleted' };
@@ -192,10 +192,15 @@ export class AnimeService {
       return [];
     }
 
-    const available = this.data.anime.flatMap((anime) => anime.genres);
-    return available.filter(
-      (genre, index, self) =>
-        genreIds.includes(genre.id) && self.findIndex((candidate) => candidate.id === genre.id) === index,
-    );
+    // Genres come from the canonical genre list, not from whatever other anime happen
+    // to use, so a genre with no titles yet can still be assigned.
+    const picked = this.data.genres.filter((genre) => genreIds.includes(genre.id));
+    if (picked.length !== genreIds.length) {
+      const known = new Set(picked.map((genre) => genre.id));
+      const unknown = genreIds.filter((genreId) => !known.has(genreId));
+      throw new BadRequestException(`Unknown genre id(s): ${unknown.join(', ')}`);
+    }
+
+    return picked.map((genre) => ({ ...genre }));
   }
 }

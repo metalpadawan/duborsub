@@ -9,19 +9,21 @@
 
 @layer base {
   :root {
-    --bg-base:    #0a0a0f;
-    --bg-surface: #111118;
-    --bg-card:    #16161e;
-    --bg-hover:   #1e1e28;
-    --accent:     #e040b0;
-    --accent-alt: #7c3aed;
-    --text-1:     #f0eff6;
-    --text-2:     #a8a4b8;
-    --text-3:     #6b6780;
-    --border:     rgba(255,255,255,0.07);
+    --bg-base:    oklch(12% 0.028 255);
+    --bg-surface: oklch(16% 0.032 255);
+    --bg-card:    oklch(19% 0.035 255);
+    --bg-hover:   oklch(24% 0.04 255);
+    --accent:     oklch(73% 0.17 156);
+    --accent-alt: oklch(70% 0.18 248);
+    --warn:       oklch(76% 0.15 78);
+    --danger:     oklch(66% 0.18 25);
+    --text-1:     oklch(96% 0.012 245);
+    --text-2:     oklch(74% 0.026 250);
+    --text-3:     oklch(56% 0.026 250);
+    --border:     color-mix(in oklch, var(--text-1) 10%, transparent);
     --radius-sm:  6px;
     --radius:     10px;
-    --radius-lg:  16px;
+    --radius-lg:  14px;
   }
 
   * { box-sizing: border-box; }
@@ -29,14 +31,18 @@
   html { scroll-behavior: smooth; }
 
   body {
-    background-color: var(--bg-base);
+    background:
+      radial-gradient(circle at 12% 0%, color-mix(in oklch, var(--accent-alt) 20%, transparent), transparent 24rem),
+      radial-gradient(circle at 88% 6%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 22rem),
+      var(--bg-base);
     color: var(--text-1);
-    font-family: 'Inter var', 'Inter', system-ui, sans-serif;
+    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
   }
 
   ::selection {
-    background: rgba(224, 64, 176, 0.3);
+    background: color-mix(in oklch, var(--accent) 30%, transparent);
     color: var(--text-1);
   }
 
@@ -53,20 +59,31 @@
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
+    box-shadow: 0 20px 70px rgb(0 0 0 / 0.18);
   }
 
   .btn-primary {
-    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all;
+    @apply px-4 py-2 rounded-lg font-semibold text-sm transition-all;
     background: var(--accent);
-    color: #fff;
+    color: oklch(10% 0.03 255);
+    min-height: 44px;
   }
   .btn-primary:hover { filter: brightness(1.1); }
   .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:focus-visible,
+  .btn-ghost:focus-visible,
+  .input:focus-visible,
+  button:focus-visible,
+  a:focus-visible {
+    outline: 3px solid color-mix(in oklch, var(--accent-alt) 65%, transparent);
+    outline-offset: 2px;
+  }
 
   .btn-ghost {
-    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all;
+    @apply px-4 py-2 rounded-lg font-semibold text-sm transition-all;
     color: var(--text-2);
     border: 1px solid var(--border);
+    min-height: 44px;
   }
   .btn-ghost:hover {
     background: var(--bg-hover);
@@ -78,6 +95,7 @@
     background: var(--bg-surface);
     border: 1px solid var(--border);
     color: var(--text-1);
+    min-height: 44px;
   }
   .input:focus { border-color: var(--accent); }
   .input::placeholder { color: var(--text-3); }
@@ -88,4 +106,19 @@
   }
   .rating-star.filled { color: #f59e0b; }
   .rating-star:hover { transform: scale(1.2); color: #f59e0b; }
+
+  .catalog-poster {
+    background:
+      linear-gradient(135deg, color-mix(in oklch, var(--accent-alt) 72%, transparent), color-mix(in oklch, var(--accent) 40%, transparent)),
+      radial-gradient(circle at 20% 18%, rgba(255,255,255,0.18), transparent 28%),
+      var(--bg-card);
+  }
+
+  .data-label {
+    color: var(--text-3);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
 }

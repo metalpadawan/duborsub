@@ -23,6 +23,12 @@ import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dt
 
 const LOCKOUT_MINUTES = 15;
 const MAX_FAILED_ATTEMPTS = 5;
+// A rotated refresh token presented again within this window is treated as a
+// concurrent refresh (two tabs, a retried request), not as theft.
+export const ROTATION_GRACE_MS = 10_000;
+// Unknown emails are compared against this hash so every login costs one bcrypt
+// comparison and response timing does not reveal which accounts exist.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(randomBytes(16).toString('hex'), 10);
 
 @Injectable()
 export class AuthService {
@@ -42,12 +48,20 @@ export class AuthService {
       throw new ConflictException('Account already exists with those credentials');
     }
 
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    // Re-check after the await: a concurrent request may have registered the same
+    // account while hashing. The check and push below run without yielding.
+    if (this.data.findUserByEmail(dto.email) || this.data.findUserByUsername(dto.username)) {
+      throw new ConflictException('Account already exists with those credentials');
+    }
+
     const now = new Date();
     const user: UserRecord = {
       id: randomUUID(),
       username: dto.username,
       email: dto.email.toLowerCase(),
-      passwordHash: await bcrypt.hash(dto.password, 10),
+      passwordHash,
       role: 'user',
       isBanned: false,
       banReason: null,
@@ -67,7 +81,11 @@ export class AuthService {
 
   async login(dto: LoginDto, ipAddress: string, userAgent: string) {
     // Login is where lockout rules, ban checks, and session creation all converge.
+    // The password is always checked first so lock and ban status are only revealed
+    // to someone who already knows the password.
     const user = this.data.findUserByEmail(dto.email);
+    const passwordMatches = await bcrypt.compare(dto.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+
     if (!user) {
       this.monitoring.recordSecurityEvent({
         type: 'auth.login.failed',
@@ -81,7 +99,40 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
+    const now = new Date();
+    const isLocked = Boolean(user.lockedUntil && user.lockedUntil > now);
+
+    if (!passwordMatches) {
+      let lockedNow = false;
+      if (!isLocked) {
+        if (user.lockedUntil) {
+          // The previous lock has expired, so the attempt counter starts over.
+          user.failedLoginAttempts = 0;
+          user.lockedUntil = null;
+        }
+
+        user.failedLoginAttempts += 1;
+        user.updatedAt = now;
+        if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+          user.lockedUntil = new Date(now.getTime() + LOCKOUT_MINUTES * 60_000);
+          lockedNow = true;
+        }
+        this.data.save();
+      }
+
+      this.monitoring.recordSecurityEvent({
+        type: lockedNow ? 'auth.login.locked' : 'auth.login.failed',
+        severity: 'warning',
+        message: lockedNow
+          ? 'An account was locked after repeated failed logins'
+          : 'A user supplied invalid credentials',
+        userId: user.id,
+        ipAddress: ipAddress || null,
+      });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (isLocked) {
       this.monitoring.recordSecurityEvent({
         type: 'auth.login.locked',
         severity: 'warning',
@@ -92,7 +143,7 @@ export class AuthService {
       throw new ForbiddenException('Account is temporarily locked');
     }
 
-    if (user.isBanned && (!user.bannedUntil || user.bannedUntil > new Date())) {
+    if (user.isBanned && (!user.bannedUntil || user.bannedUntil > now)) {
       this.monitoring.recordSecurityEvent({
         type: 'auth.login.banned',
         severity: 'warning',
@@ -103,33 +154,13 @@ export class AuthService {
       throw new ForbiddenException('Account has been suspended');
     }
 
-    const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!passwordMatches) {
-      user.failedLoginAttempts += 1;
-      user.updatedAt = new Date();
-      if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
-        user.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60_000);
-      }
-      this.data.save();
-      this.monitoring.recordSecurityEvent({
-        type: user.lockedUntil ? 'auth.login.locked' : 'auth.login.failed',
-        severity: 'warning',
-        message: user.lockedUntil
-          ? 'An account was locked after repeated failed logins'
-          : 'A user supplied invalid credentials',
-        userId: user.id,
-        ipAddress: ipAddress || null,
-      });
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
     user.failedLoginAttempts = 0;
     user.lockedUntil = null;
     user.lastLoginAt = new Date();
     user.updatedAt = new Date();
 
     const accessToken = await this.signAccessToken(user);
-    const refreshToken = this.issueRefreshToken(user.id, ipAddress, userAgent);
+    const { rawToken: refreshToken } = this.issueRefreshToken(user.id, ipAddress, userAgent);
     this.data.save();
     this.monitoring.recordSecurityEvent({
       type: 'auth.login.succeeded',
@@ -162,6 +193,22 @@ export class AuthService {
     const stored = this.data.refreshTokens.find((entry) => entry.tokenHash === tokenHash) ?? null;
 
     if (stored?.revokedAt) {
+      const recentlyRotated =
+        Boolean(stored.replacedByTokenId) && Date.now() - stored.revokedAt.getTime() < ROTATION_GRACE_MS;
+
+      if (recentlyRotated) {
+        // A concurrent refresh already rotated this token. Reject this request without
+        // revoking anything; the client retries with the cookie the winner received.
+        this.monitoring.recordSecurityEvent({
+          type: 'auth.refresh.concurrent',
+          severity: 'info',
+          message: 'A just-rotated refresh token was presented again inside the grace window',
+          userId: stored.userId,
+          ipAddress: ipAddress || null,
+        });
+        throw new UnauthorizedException('Refresh token already rotated');
+      }
+
       this.revokeActiveSessionsForUser(stored.userId);
       this.data.save();
       this.monitoring.recordSecurityEvent({
@@ -198,16 +245,19 @@ export class AuthService {
     }
 
     if (stored.userAgent && userAgent && stored.userAgent !== userAgent) {
-      stored.revokedAt = new Date();
-      this.data.save();
+      // User agents change on every browser update, so a mismatch is recorded for
+      // review instead of ending the session.
       this.monitoring.recordSecurityEvent({
         type: 'auth.refresh.user_agent_mismatch',
-        severity: 'critical',
+        severity: 'warning',
         message: 'A refresh token was presented from a different user agent',
         userId: user.id,
         ipAddress: ipAddress || null,
+        metadata: {
+          previousUserAgent: stored.userAgent,
+          currentUserAgent: userAgent,
+        },
       });
-      throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
     if (user.isBanned && (!user.bannedUntil || user.bannedUntil > new Date())) {
@@ -236,9 +286,10 @@ export class AuthService {
       throw new ForbiddenException('Account is temporarily locked');
     }
 
-    stored.revokedAt = new Date();
     const accessToken = await this.signAccessToken(user);
-    const refreshToken = this.issueRefreshToken(user.id, ipAddress, userAgent);
+    const { rawToken: refreshToken, id: replacementId } = this.issueRefreshToken(user.id, ipAddress, userAgent);
+    stored.revokedAt = new Date();
+    stored.replacedByTokenId = replacementId;
     this.data.save();
     this.monitoring.recordSecurityEvent({
       type: 'auth.refresh.succeeded',
@@ -295,7 +346,9 @@ export class AuthService {
       message: 'If that email exists, a reset link has been sent',
     };
 
-    if (this.config.get<string>('NODE_ENV', 'development') !== 'production') {
+    // Returning the token is a local-testing shortcut until SMTP is wired up. It is
+    // opt-in, and environment validation refuses to enable it in production.
+    if (this.config.get<boolean>('EXPOSE_RESET_TOKEN', false) === true) {
       response.debugToken = token;
     }
 
@@ -377,12 +430,13 @@ export class AuthService {
       userAgent: userAgent || null,
       expiresAt: new Date(Date.now() + this.getRefreshTokenTtlMs()),
       revokedAt: null,
+      replacedByTokenId: null,
       createdAt: new Date(),
     };
 
     this.data.refreshTokens.push(record);
 
-    return rawToken;
+    return { rawToken, id: record.id };
   }
 
   private hashToken(token: string) {

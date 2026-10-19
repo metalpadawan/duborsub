@@ -1,11 +1,14 @@
 // DataService is the current persistence boundary for the local AniRate runtime.
 // It seeds realistic sample data on first boot, then saves all later mutations to
 // a JSON datastore on disk so the app survives restarts without extra setup.
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { rename, writeFile } from 'fs/promises';
 import { dirname, resolve } from 'path';
 import { randomUUID } from 'crypto';
+import { removeWhere } from '../common/collections/remove-where';
 
 export type UserRole = 'user' | 'admin';
 export type AnimeStatus = 'airing' | 'completed' | 'upcoming';
@@ -80,6 +83,9 @@ export interface RefreshTokenRecord {
   userAgent: string | null;
   expiresAt: Date;
   revokedAt: Date | null;
+  // Set when the token was revoked by normal rotation, so a near-simultaneous
+  // second refresh can be told apart from a stolen token being replayed.
+  replacedByTokenId: string | null;
   createdAt: Date;
 }
 
@@ -127,9 +133,10 @@ interface PersistedSnapshot {
   commentLikes?: Array<Omit<CommentLikeRecord, 'createdAt'> & {
     createdAt: string | Date;
   }>;
-  refreshTokens?: Array<Omit<RefreshTokenRecord, 'expiresAt' | 'revokedAt' | 'createdAt'> & {
+  refreshTokens?: Array<Omit<RefreshTokenRecord, 'expiresAt' | 'revokedAt' | 'replacedByTokenId' | 'createdAt'> & {
     expiresAt: string | Date;
     revokedAt: string | Date | null;
+    replacedByTokenId?: string | null;
     createdAt: string | Date;
   }>;
   passwordResetTokens?: Array<Omit<PasswordResetTokenRecord, 'expiresAt' | 'usedAt' | 'createdAt'> & {
@@ -142,12 +149,26 @@ interface PersistedSnapshot {
   }>;
 }
 
-const DATA_FILE = resolve(__dirname, '..', '..', '.data', 'anirate-db.json');
+const DEFAULT_DATA_FILE = resolve(__dirname, '..', '..', '.data', 'anirate-db.json');
+// Mutations inside this window share one disk write instead of one write each.
+const SAVE_DEBOUNCE_MS = 50;
+
+const SEED_GENRES: GenreRecord[] = [
+  { id: 1, name: 'Action' },
+  { id: 2, name: 'Adventure' },
+  { id: 3, name: 'Drama' },
+  { id: 4, name: 'Fantasy' },
+  { id: 5, name: 'Mystery' },
+  { id: 6, name: 'Sci-Fi' },
+];
 
 @Injectable()
-export class DataService {
+export class DataService implements OnApplicationShutdown {
   private readonly logger = new Logger(DataService.name);
-  private readonly storagePath = DATA_FILE;
+  private readonly storagePath: string;
+  private writeTimer: NodeJS.Timeout | null = null;
+  private writeChain: Promise<void> = Promise.resolve();
+  private tempFileCounter = 0;
 
   // These arrays are still the in-process working set, but they are now backed by
   // a datastore file instead of disappearing whenever the server restarts.
@@ -161,7 +182,8 @@ export class DataService {
   readonly passwordResetTokens: PasswordResetTokenRecord[] = [];
   readonly adminLogs: AdminLogRecord[] = [];
 
-  constructor() {
+  constructor(private readonly config: ConfigService) {
+    this.storagePath = this.config.get<string>('DATA_FILE') ?? DEFAULT_DATA_FILE;
     this.loadOrSeed();
   }
 
@@ -183,11 +205,70 @@ export class DataService {
   }
 
   save() {
-    // Saving uses an atomic rename so a partial write does not corrupt the datastore.
+    // Writes are coalesced and done asynchronously so a burst of requests does not
+    // block the event loop rewriting the whole file once per mutation.
+    if (this.writeTimer) {
+      return;
+    }
+
+    this.writeTimer = setTimeout(() => {
+      this.writeTimer = null;
+      const payload = this.serialize();
+      this.writeChain = this.writeChain
+        .then(() => this.writeAtomic(payload))
+        .catch((error: Error) => {
+          this.logger.error(`Failed to persist datastore: ${error.message}`);
+        });
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  async flush() {
+    // Wait for in-flight writes first so an older snapshot cannot land after this one.
+    if (this.writeTimer) {
+      clearTimeout(this.writeTimer);
+      this.writeTimer = null;
+    }
+
+    await this.writeChain;
+    this.writeSync(this.serialize());
+  }
+
+  async onApplicationShutdown() {
+    await this.flush();
+  }
+
+  private serialize() {
+    this.pruneExpiredTokens(new Date());
+    return JSON.stringify(this.snapshot(), null, 2);
+  }
+
+  private pruneExpiredTokens(now: Date) {
+    // Expired sessions and spent reset tokens can never be accepted again, so keeping
+    // them only grows the file. Revoked-but-unexpired refresh tokens stay because
+    // reuse detection depends on recognising them.
+    removeWhere(this.refreshTokens, (token) => token.expiresAt <= now);
+    removeWhere(this.passwordResetTokens, (token) => token.expiresAt <= now || token.usedAt !== null);
+  }
+
+  private async writeAtomic(payload: string) {
+    // Each write uses its own temp file and an atomic rename, so a partial write
+    // never corrupts the datastore and overlapping writes never share a temp file.
     mkdirSync(dirname(this.storagePath), { recursive: true });
-    const tempFile = `${this.storagePath}.tmp`;
-    writeFileSync(tempFile, JSON.stringify(this.snapshot(), null, 2), 'utf8');
+    const tempFile = this.nextTempFile();
+    await writeFile(tempFile, payload, 'utf8');
+    await rename(tempFile, this.storagePath);
+  }
+
+  private writeSync(payload: string) {
+    mkdirSync(dirname(this.storagePath), { recursive: true });
+    const tempFile = this.nextTempFile();
+    writeFileSync(tempFile, payload, 'utf8');
     renameSync(tempFile, this.storagePath);
+  }
+
+  private nextTempFile() {
+    this.tempFileCounter += 1;
+    return `${this.storagePath}.${process.pid}.${this.tempFileCounter}.tmp`;
   }
 
   private loadOrSeed() {
@@ -196,7 +277,9 @@ export class DataService {
     }
 
     this.seed();
-    this.save();
+    // The first write is synchronous so the file exists as soon as boot finishes,
+    // which the AniList import script relies on.
+    this.writeSync(this.serialize());
   }
 
   private loadFromDisk() {
@@ -281,6 +364,7 @@ export class DataService {
         ...token,
         expiresAt: this.toDate(token.expiresAt),
         revokedAt: this.toDate(token.revokedAt),
+        replacedByTokenId: token.replacedByTokenId ?? null,
         createdAt: this.toDate(token.createdAt),
       })),
     );
@@ -333,23 +417,22 @@ export class DataService {
       return;
     }
 
-    // Seed just enough realistic data to make every page feel populated on first boot.
     const now = new Date();
-    const adminId = randomUUID();
-    const demoId = randomUUID();
-    const guestId = randomUUID();
-    const passwordHash = bcrypt.hashSync('Password123!', 10);
-
-    const genres: GenreRecord[] = [
-      { id: 1, name: 'Action' },
-      { id: 2, name: 'Adventure' },
-      { id: 3, name: 'Drama' },
-      { id: 4, name: 'Fantasy' },
-      { id: 5, name: 'Mystery' },
-      { id: 6, name: 'Sci-Fi' },
-    ];
-
+    const genres = SEED_GENRES.map((genre) => ({ ...genre }));
     this.genres.push(...genres);
+
+    if (this.config.get<string>('NODE_ENV') === 'production') {
+      // Production never gets the demo accounts and their published password. An
+      // admin is only created when its credentials come from the environment.
+      this.seedProductionAdmin(now);
+      return;
+    }
+
+    // Seed just enough realistic data to make every page feel populated on first boot.
+    const adminId = 'seed-user-admin';
+    const demoId = 'seed-user-demo';
+    const guestId = 'seed-user-otaku';
+    const passwordHash = bcrypt.hashSync('Password123!', 10);
 
     this.users.push(
       {
@@ -399,12 +482,12 @@ export class DataService {
       },
     );
 
-    const animeOne = randomUUID();
-    const animeTwo = randomUUID();
-    const animeThree = randomUUID();
-    const animeFour = randomUUID();
-    const animeFive = randomUUID();
-    const animeSix = randomUUID();
+    const animeOne = 'ff0c8c69-b21f-4dfa-a22b-1bfba63c20e3';
+    const animeTwo = '00955f2a-9ded-443c-ae93-6eb7e6e987ec';
+    const animeThree = 'ce094da3-7f20-4b11-aa7e-d9540691520d';
+    const animeFour = '665c3d83-1862-4d22-bd19-a3a69c3720f5';
+    const animeFive = 'aeae9dd3-554e-47bf-9bb7-297566662dd1';
+    const animeSix = 'a9a18938-2963-46ba-ae87-6bfabdd1ecb8';
 
     this.anime.push(
       {
@@ -569,5 +652,33 @@ export class DataService {
       { commentId: firstCommentId, userId: adminId, value: 1, createdAt: now },
       { commentId: firstCommentId, userId: guestId, value: 1, createdAt: now },
     );
+  }
+
+  private seedProductionAdmin(now: Date) {
+    const email = this.config.get<string>('SEED_ADMIN_EMAIL');
+    const password = this.config.get<string>('SEED_ADMIN_PASSWORD');
+
+    if (!email || !password) {
+      this.logger.warn(
+        'Production datastore created without an admin. Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD to create one on first boot.',
+      );
+      return;
+    }
+
+    this.users.push({
+      id: randomUUID(),
+      username: 'admin',
+      email: email.toLowerCase(),
+      passwordHash: bcrypt.hashSync(password, 12),
+      role: 'admin',
+      isBanned: false,
+      banReason: null,
+      bannedUntil: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      lastLoginAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 }

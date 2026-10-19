@@ -1,6 +1,9 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { CommentsService } from './comments.service';
+import { CreateCommentDto } from './dto/comments.dto';
 import { DataService } from '../data/data.service';
 
 function createCommentsDataMock() {
@@ -69,6 +72,23 @@ describe('CommentsService', () => {
         content: 'Trying to edit through the wrong anime route',
       }),
     ).toThrow(NotFoundException);
+  });
+
+  it('rejects replies to replies, which the thread view would never show', () => {
+    const data = createCommentsDataMock();
+    const service = new CommentsService(data as unknown as DataService);
+    const reply = service.create('user-2', 'anime-1', { content: 'First reply', parentId: 'comment-1' });
+
+    expect(() =>
+      service.create('user-1', 'anime-1', { content: 'Reply to the reply', parentId: reply.id }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('keeps comment text as typed, including angle brackets and newlines', async () => {
+    const dto = plainToInstance(CreateCommentDto, { content: '  a < b, <3\nsecond line\u0007  ' });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.content).toBe('a < b, <3\nsecond line');
   });
 
   it('blocks votes against deleted comments', () => {
