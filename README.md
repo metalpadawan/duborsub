@@ -47,9 +47,7 @@ Install app dependencies if needed:
 npm run setup
 ```
 
-Copy `apps/anirate-base/backend/.env.example` to `.env` in the same folder; its database settings already match the local Docker database.
-
-Start everything from the repo root. This starts PostgreSQL (`npm run db:up`), applies any new migrations, then runs the backend and frontend:
+Start everything from the repo root. This starts PostgreSQL (`npm run db:up`), applies any new migrations, then runs the backend and frontend. The first run creates the git-ignored `.env` files: a random database password in the repo-root `.env`, and `apps/anirate-base/backend/.env` from its example (set `JWT_SECRET` there, as the example explains). Database passwords never go in tracked files, and the database only listens on this machine.
 
 ```powershell
 npm run dev

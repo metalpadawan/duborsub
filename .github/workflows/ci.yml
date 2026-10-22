@@ -19,13 +19,14 @@ jobs:
     defaults:
       run:
         working-directory: apps/anirate-base/backend
-    # The service tests run against a real PostgreSQL, migrated and wiped per run.
+    # The service tests run against a real PostgreSQL, migrated and wiped per run. It is
+    # a throwaway container reachable only inside the job, so it needs no password.
     services:
       postgres:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: anirate
-          POSTGRES_PASSWORD: anirate_ci
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: anime_platform_test
         ports:
           - 5432:5432
@@ -35,8 +36,8 @@ jobs:
           --health-timeout 3s
           --health-retries 30
     env:
-      DATABASE_URL: postgresql://anirate:anirate_ci@localhost:5432/anime_platform_test?schema=public
-      DATABASE_URL_TEST: postgresql://anirate:anirate_ci@localhost:5432/anime_platform_test?schema=public
+      DATABASE_URL: postgresql://anirate@localhost:5432/anime_platform_test?schema=public
+      DATABASE_URL_TEST: postgresql://anirate@localhost:5432/anime_platform_test?schema=public
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

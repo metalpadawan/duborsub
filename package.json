@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "setup": "npm install --prefix apps/anirate-base/backend && npm install --prefix apps/anirate-base/frontend",
-    "db:up": "docker compose up -d --wait && npm --prefix apps/anirate-base/backend run db:deploy",
+    "db:up": "node database/setup-local.mjs && npm --prefix apps/anirate-base/backend run db:deploy",
     "db:down": "docker compose stop",
     "dev": "npm run db:up && concurrently -k -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:fresh": "npm run stop && npm run dev",

@@ -25,7 +25,7 @@ apps/anirate-base/
 
 ## Start The App
 
-Start Docker Desktop, copy `backend/.env.example` to `backend/.env`, then from the repo root:
+Start Docker Desktop, then from the repo root (the first run creates the `.env` files and a random local database password):
 
 ```powershell
 npm run dev

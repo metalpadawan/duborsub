@@ -1,5 +1,6 @@
 # Local PostgreSQL for AniRate development: `npm run db:up` from the repo root.
-# The credentials are for this machine only; deployments supply their own DATABASE_URL.
+# The password comes from the git-ignored repo-root .env, which `npm run db:up`
+# creates with a random value on first run (database/setup-local.mjs).
 services:
   postgres:
     image: postgres:16-alpine
@@ -7,10 +8,11 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: anirate
-      POSTGRES_PASSWORD: anirate_dev
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run "npm run db:up" from the repo root to create .env with a database password}
       POSTGRES_DB: anime_platform
     ports:
-      - '5432:5432'
+      # This machine only: the database is never reachable from the network.
+      - '127.0.0.1:5432:5432'
     volumes:
       - anirate-postgres:/var/lib/postgresql/data
       # Creates the separate database the backend tests use.
