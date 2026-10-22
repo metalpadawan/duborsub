@@ -1,56 +1,25 @@
-import { describe, expect, it, beforeEach, jest } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuthService, ROTATION_GRACE_MS } from './auth.service';
 import { LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth.dto';
-import { DataService, PasswordResetTokenRecord, RefreshTokenRecord, UserRecord } from '../data/data.service';
 import { MonitoringService } from '../monitoring/monitoring.service';
+import { createTestPrisma, createUser as insertUser, resetDatabase } from '../test-utils/database';
 
-type DataServiceMock = Pick<
-  DataService,
-  'users' | 'refreshTokens' | 'passwordResetTokens' | 'findUserByEmail' | 'findUserByUsername' | 'findUserById' | 'save'
->;
+const prisma = createTestPrisma();
 
-function createUser(overrides: Partial<UserRecord> = {}): UserRecord {
-  const now = new Date('2026-01-01T00:00:00.000Z');
-
-  return {
-    id: 'user-1',
-    username: 'demo',
-    email: 'demo@example.com',
-    passwordHash: bcrypt.hashSync('Password123!', 10),
-    role: 'user',
-    isBanned: false,
-    banReason: null,
-    bannedUntil: null,
-    failedLoginAttempts: 0,
-    lockedUntil: null,
-    lastLoginAt: null,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  };
+function createUser(overrides: Partial<User> = {}) {
+  return insertUser(prisma, { id: 'user-1', username: 'demo', email: 'demo@example.com', ...overrides });
 }
 
-function createDataServiceMock(initialUsers: UserRecord[] = []): DataServiceMock {
-  const users = [...initialUsers];
-  const refreshTokens: RefreshTokenRecord[] = [];
-  const passwordResetTokens: PasswordResetTokenRecord[] = [];
+const reload = (id = 'user-1') => prisma.user.findUniqueOrThrow({ where: { id } });
+const tokens = () => prisma.refreshToken.findMany({ orderBy: { createdAt: 'asc' } });
 
-  return {
-    users,
-    refreshTokens,
-    passwordResetTokens,
-    findUserByEmail: (email: string) =>
-      users.find((user) => user.email.toLowerCase() === email.toLowerCase()) ?? null,
-    findUserByUsername: (username: string) =>
-      users.find((user) => user.username.toLowerCase() === username.toLowerCase()) ?? null,
-    findUserById: (id: string) => users.find((user) => user.id === id) ?? null,
-    save: jest.fn(),
-  };
-}
+beforeEach(() => resetDatabase(prisma));
+afterAll(() => prisma.$disconnect());
 
 describe('AuthService', () => {
   let jwt: JwtService;
@@ -90,8 +59,7 @@ describe('AuthService', () => {
   });
 
   it('registers a new user, lowercases the email, and persists the change', async () => {
-    const data = createDataServiceMock();
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring);
     const dto: RegisterDto = {
       username: 'NewUser',
       email: 'NewUser@Example.com',
@@ -103,15 +71,14 @@ describe('AuthService', () => {
     expect(created.email).toBe('newuser@example.com');
     expect(created.username).toBe('NewUser');
     expect(created).not.toHaveProperty('passwordHash');
-    expect(data.users).toHaveLength(1);
-    expect(data.users[0].passwordHash).not.toBe(dto.password);
-    expect(data.save).toHaveBeenCalledTimes(1);
+    const stored = await prisma.user.findMany();
+    expect(stored).toHaveLength(1);
+    expect(stored[0].passwordHash).not.toBe(dto.password);
   });
 
   it('rejects invalid credentials and records the failed attempt', async () => {
-    const user = createUser();
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring);
     const dto: LoginDto = {
       email: user.email,
       password: 'DefinitelyWrong123!',
@@ -119,14 +86,12 @@ describe('AuthService', () => {
 
     await expect(service.login(dto, '127.0.0.1', 'jest')).rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(user.failedLoginAttempts).toBe(1);
-    expect(data.save).toHaveBeenCalledTimes(1);
+    expect((await reload()).failedLoginAttempts).toBe(1);
   });
 
   it('locks an account after too many failed login attempts', async () => {
-    const user = createUser({ failedLoginAttempts: 4 });
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser({ failedLoginAttempts: 4 });
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     await expect(
       service.login(
@@ -139,14 +104,14 @@ describe('AuthService', () => {
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(user.failedLoginAttempts).toBe(5);
-    expect(user.lockedUntil).toBeInstanceOf(Date);
+    const locked = await reload();
+    expect(locked.failedLoginAttempts).toBe(5);
+    expect(locked.lockedUntil).toBeInstanceOf(Date);
   });
 
   it('returns tokens and rotates refresh sessions on successful login and refresh', async () => {
-    const user = createUser();
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     const loginResult = await service.login(
       {
@@ -159,22 +124,21 @@ describe('AuthService', () => {
 
     expect(loginResult.accessToken).toBe('signed-access-token');
     expect(loginResult.refreshToken).toEqual(expect.any(String));
-    expect(data.refreshTokens).toHaveLength(1);
-    expect(data.save).toHaveBeenCalledTimes(1);
+    expect(await tokens()).toHaveLength(1);
 
     const refreshResult = await service.refresh(loginResult.refreshToken, '127.0.0.1', 'jest');
 
     expect(refreshResult.accessToken).toBe('signed-access-token');
     expect(refreshResult.refreshToken).toEqual(expect.any(String));
-    expect(data.refreshTokens).toHaveLength(2);
-    expect(data.refreshTokens[0].revokedAt).toBeInstanceOf(Date);
-    expect(data.save).toHaveBeenCalledTimes(2);
+    const rotated = await tokens();
+    expect(rotated).toHaveLength(2);
+    expect(rotated[0].revokedAt).toBeInstanceOf(Date);
+    expect(rotated[0].replacedByTokenId).toBe(rotated[1].id);
   });
 
   it('rejects refresh requests when the original session is missing', async () => {
-    const user = createUser();
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     await expect(service.refresh('missing-token', '127.0.0.1', 'jest')).rejects.toBeInstanceOf(
       UnauthorizedException,
@@ -182,9 +146,8 @@ describe('AuthService', () => {
   });
 
   it('revokes every session when a rotated refresh token is reused after the grace window', async () => {
-    const user = createUser();
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     const loginResult = await service.login(
       {
@@ -196,19 +159,22 @@ describe('AuthService', () => {
     );
 
     await service.refresh(loginResult.refreshToken, '127.0.0.1', 'jest');
-    data.refreshTokens[0].revokedAt = new Date(Date.now() - ROTATION_GRACE_MS - 1_000);
+    const [original] = await tokens();
+    await prisma.refreshToken.update({
+      where: { id: original.id },
+      data: { revokedAt: new Date(Date.now() - ROTATION_GRACE_MS - 1_000) },
+    });
 
     await expect(service.refresh(loginResult.refreshToken, '127.0.0.1', 'jest')).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
 
-    expect(data.refreshTokens.every((token) => token.revokedAt instanceof Date)).toBe(true);
+    expect((await tokens()).every((token) => token.revokedAt instanceof Date)).toBe(true);
   });
 
   it('rejects a just-rotated token without revoking the session that replaced it', async () => {
-    const user = createUser();
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     const loginResult = await service.login({ email: user.email, password: 'Password123!' }, '127.0.0.1', 'jest');
     const rotated = await service.refresh(loginResult.refreshToken, '127.0.0.1', 'jest');
@@ -218,14 +184,13 @@ describe('AuthService', () => {
       UnauthorizedException,
     );
 
-    expect(data.refreshTokens[1].revokedAt).toBeNull();
+    expect((await tokens())[1].revokedAt).toBeNull();
     await expect(service.refresh(rotated.refreshToken, '127.0.0.1', 'jest')).resolves.toHaveProperty('accessToken');
   });
 
   it('keeps the session when the user agent changes, and records the mismatch', async () => {
-    const user = createUser();
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     const loginResult = await service.login({ email: user.email, password: 'Password123!' }, '127.0.0.1', 'Browser/1');
 
@@ -238,9 +203,8 @@ describe('AuthService', () => {
   });
 
   it('does not reveal lock status to someone with the wrong password', async () => {
-    const user = createUser({ failedLoginAttempts: 5, lockedUntil: new Date(Date.now() + 60_000) });
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser({ failedLoginAttempts: 5, lockedUntil: new Date(Date.now() + 60_000) });
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     await expect(
       service.login({ email: user.email, password: 'DefinitelyWrong123!' }, '127.0.0.1', 'jest'),
@@ -248,25 +212,24 @@ describe('AuthService', () => {
     await expect(
       service.login({ email: user.email, password: 'Password123!' }, '127.0.0.1', 'jest'),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(user.failedLoginAttempts).toBe(5);
+    expect((await reload()).failedLoginAttempts).toBe(5);
   });
 
   it('starts the failed-attempt count over once a lock has expired', async () => {
-    const user = createUser({ failedLoginAttempts: 5, lockedUntil: new Date(Date.now() - 1_000) });
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser({ failedLoginAttempts: 5, lockedUntil: new Date(Date.now() - 1_000) });
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     await expect(
       service.login({ email: user.email, password: 'DefinitelyWrong123!' }, '127.0.0.1', 'jest'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(user.failedLoginAttempts).toBe(1);
-    expect(user.lockedUntil).toBeNull();
+    const reset = await reload();
+    expect(reset.failedLoginAttempts).toBe(1);
+    expect(reset.lockedUntil).toBeNull();
   });
 
   it('runs a password comparison even when the email is unknown', async () => {
-    const data = createDataServiceMock();
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring);
     // Spy on the CommonJS module object; the namespace import's properties are read-only.
     const compare = jest.spyOn(jest.requireActual<typeof bcrypt>('bcrypt'), 'compare');
 
@@ -279,8 +242,7 @@ describe('AuthService', () => {
   });
 
   it('lets only one of two concurrent registrations for the same email succeed', async () => {
-    const data = createDataServiceMock();
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring);
     const dto: RegisterDto = { username: 'racer', email: 'racer@example.com', password: 'Password123!' };
 
     const results = await Promise.allSettled([
@@ -292,30 +254,28 @@ describe('AuthService', () => {
     expect(results.find((result) => result.status === 'rejected')).toMatchObject({
       reason: expect.any(ConflictException),
     });
-    expect(data.users).toHaveLength(1);
+    expect(await prisma.user.count()).toBe(1);
   });
 
   it('does not return the reset token unless EXPOSE_RESET_TOKEN is enabled', async () => {
-    const user = createUser();
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     const response = await service.forgotPassword({ email: user.email });
 
     expect(response).not.toHaveProperty('debugToken');
-    expect(data.passwordResetTokens).toHaveLength(1);
+    expect(await prisma.passwordResetToken.count()).toBe(1);
   });
 
   it('issues a debug reset token when enabled and updates the password when it is used', async () => {
     configValues.EXPOSE_RESET_TOKEN = true;
-    const user = createUser();
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const user = await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     const forgotPassword = await service.forgotPassword({ email: user.email });
 
     expect(forgotPassword).toHaveProperty('debugToken');
-    expect(data.passwordResetTokens).toHaveLength(1);
+    expect(await prisma.passwordResetToken.count()).toBe(1);
 
     const resetDto: ResetPasswordDto = {
       token: String(forgotPassword.debugToken),
@@ -326,17 +286,32 @@ describe('AuthService', () => {
       message: 'Password updated successfully',
     });
 
-    expect(await bcrypt.compare('Different123!', user.passwordHash)).toBe(true);
-    expect(data.passwordResetTokens[0].usedAt).toBeInstanceOf(Date);
+    expect(await bcrypt.compare('Different123!', (await reload()).passwordHash)).toBe(true);
+    expect((await prisma.passwordResetToken.findFirstOrThrow()).usedAt).toBeInstanceOf(Date);
+    // The same link cannot be spent twice.
+    await expect(service.resetPassword(resetDto)).rejects.toThrow('Invalid or expired reset token');
+  });
+
+  it('lets only one of two simultaneous refreshes rotate the same token', async () => {
+    const user = await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring);
+    const { refreshToken } = await service.login({ email: user.email, password: 'Password123!' }, '127.0.0.1', 'jest');
+
+    const results = await Promise.allSettled([
+      service.refresh(refreshToken, '127.0.0.1', 'jest'),
+      service.refresh(refreshToken, '127.0.0.1', 'jest'),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect((await tokens()).filter((token) => token.revokedAt === null)).toHaveLength(1);
   });
 
   it('blocks login for a currently banned user', async () => {
-    const user = createUser({
+    const user = await createUser({
       isBanned: true,
       bannedUntil: new Date(Date.now() + 60_000),
     });
-    const data = createDataServiceMock([user]);
-    const service = new AuthService(data as unknown as DataService, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring);
 
     await expect(
       service.login(

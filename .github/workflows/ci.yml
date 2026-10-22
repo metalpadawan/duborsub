@@ -1,0 +1,76 @@
+# Lint, test and build both apps on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/anirate-base/backend
+    # The service tests run against a real PostgreSQL, migrated and wiped per run.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: anirate
+          POSTGRES_PASSWORD: anirate_ci
+          POSTGRES_DB: anime_platform_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U anirate -d anime_platform_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://anirate:anirate_ci@localhost:5432/anime_platform_test?schema=public
+      DATABASE_URL_TEST: postgresql://anirate:anirate_ci@localhost:5432/anime_platform_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/anirate-base/backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/anirate-base/frontend
+    env:
+      # A local URL is accepted by the API client's HTTPS check; the build only needs
+      # a well-formed address and falls back to the bundled demo catalogue.
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/anirate-base/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

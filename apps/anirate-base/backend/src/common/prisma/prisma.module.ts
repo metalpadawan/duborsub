@@ -1,14 +1,13 @@
-// PrismaModule now provides the live PostgreSQL client plus a small development
-// seed bootstrap so the app can populate demo data in an empty database.
-import { Module, Global } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+// PrismaModule provides the PostgreSQL client to every module, seeds an empty
+// database on boot, and prunes dead tokens.
+import { Global, Module } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
-import { PrismaBootstrapService } from './prisma-bootstrap.service';
+import { SeedService } from './seed.service';
+import { TokenCleanupService } from './token-cleanup.service';
 
 @Global()
 @Module({
-  imports: [ConfigModule],
-  providers: [PrismaService, PrismaBootstrapService],
+  providers: [PrismaService, SeedService, TokenCleanupService],
   exports: [PrismaService],
 })
 export class PrismaModule {}

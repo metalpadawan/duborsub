@@ -1,206 +1,275 @@
 // AnimeService centralizes catalog reads and admin mutations for anime records.
-// It also enriches raw anime records with derived rating statistics for the UI.
+// Rating totals are kept on each anime row (see anime-stats.ts), so every list
+// order except search relevance is a plain SQL ORDER BY.
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { removeWhere } from '../common/collections/remove-where';
-import { DataService } from '../data/data.service';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { buildSearchText, searchKey, sortTitleOf } from '../common/search/search-key';
 import { AnimeQueryDto, CreateAnimeDto, UpdateAnimeDto } from './dto/anime.dto';
+
+const LIST_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  coverImageUrl: true,
+  releaseYear: true,
+  hasDub: true,
+  status: true,
+  format: true,
+  episodes: true,
+  popularity: true,
+  avgSubRating: true,
+  avgDubRating: true,
+  totalVotes: true,
+  createdAt: true,
+  updatedAt: true,
+  genres: { select: { genre: { select: { id: true, name: true } } }, orderBy: { genreId: 'asc' } },
+} satisfies Prisma.AnimeSelect;
+
+type ListRow = Prisma.AnimeGetPayload<{ select: typeof LIST_SELECT }>;
 
 @Injectable()
 export class AnimeService {
-  constructor(private readonly data: DataService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  findAll(query: AnimeQueryDto) {
-    // Build the list in memory, then apply filters, sorting, and pagination in a predictable order.
+  async findAll(query: AnimeQueryDto) {
     const {
       search,
       status,
       year,
       genreId,
-      sortBy = 'title',
-      order = 'asc',
+      rated,
+      sortBy = search ? 'relevance' : 'title',
+      order = sortBy === 'title' ? 'asc' : 'desc',
       page = 1,
       limit = 20,
     } = query;
 
-    let items = this.data.anime.map((anime) => this.enrichAnime(anime.id));
+    const needle = search ? searchKey(search) : '';
+    // One or two letters appear inside most titles and are below the trigram
+    // index's reach, so a short search matches words that start with them and is
+    // ordered by popularity in SQL instead of ranked in the application.
+    const shortNeedle = needle.length > 0 && needle.length < 3;
+    const where: Prisma.AnimeWhereInput = {
+      ...(needle && !shortNeedle ? { searchText: { contains: needle } } : {}),
+      ...(shortNeedle ? { OR: [{ searchText: { startsWith: needle } }, { searchText: { contains: ` ${needle}` } }] } : {}),
+      ...(status ? { status } : {}),
+      ...(year ? { releaseYear: year } : {}),
+      ...(genreId ? { genres: { some: { genreId } } } : {}),
+      ...(rated ? { totalVotes: { gt: 0 } } : {}),
+    };
+    const skip = (page - 1) * limit;
 
-    if (search) {
-      const needle = search.toLowerCase();
-      items = items.filter((anime) => anime.title.toLowerCase().includes(needle));
+    let total: number;
+    let rows: ListRow[];
+    if (sortBy === 'relevance' && needle && !shortNeedle) {
+      ({ total, rows } = await this.findByRelevance(where, needle, skip, limit));
+    } else {
+      const sqlSort = sortBy === 'relevance' ? 'popular' : sortBy;
+      const sqlOrder = sortBy === 'relevance' ? 'desc' : order;
+      [total, rows] = await Promise.all([
+        this.prisma.anime.count({ where }),
+        this.prisma.anime.findMany({ where, orderBy: this.orderBy(sqlSort, sqlOrder), skip, take: limit, select: LIST_SELECT }),
+      ]);
     }
-
-    if (status) {
-      items = items.filter((anime) => anime.status === status);
-    }
-
-    if (year) {
-      items = items.filter((anime) => anime.releaseYear === year);
-    }
-
-    if (genreId) {
-      items = items.filter((anime) => anime.genres.some((genre) => genre.id === genreId));
-    }
-
-    items.sort((left, right) => {
-      if (sortBy === 'rating') {
-        const leftValue = left.avgSubRating ?? 0;
-        const rightValue = right.avgSubRating ?? 0;
-        return order === 'asc' ? leftValue - rightValue : rightValue - leftValue;
-      }
-
-      if (sortBy === 'votes') {
-        return order === 'asc'
-          ? left.totalVotes - right.totalVotes
-          : right.totalVotes - left.totalVotes;
-      }
-
-      if (sortBy === 'year') {
-        const leftValue = left.releaseYear ?? 0;
-        const rightValue = right.releaseYear ?? 0;
-        return order === 'asc' ? leftValue - rightValue : rightValue - leftValue;
-      }
-
-      return order === 'asc'
-        ? left.title.localeCompare(right.title)
-        : right.title.localeCompare(left.title);
-    });
-
-    const total = items.length;
-    const start = (page - 1) * limit;
-    const paged = items.slice(start, start + limit);
 
     return {
-      items: paged,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.max(1, Math.ceil(total / limit)),
-      },
+      items: rows.map((row) => this.toListItem(row)),
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
     };
   }
 
-  findOne(id: string) {
-    return this.enrichAnime(id);
-  }
-
-  create(dto: CreateAnimeDto) {
-    // Admin creation writes a new raw record first, then returns the enriched view shape.
-    const now = new Date();
-    const anime = {
-      id: randomUUID(),
-      title: dto.title,
-      description: dto.description ?? '',
-      coverImageUrl: dto.coverImageUrl ?? null,
-      releaseYear: dto.releaseYear ?? null,
-      hasDub: dto.hasDub ?? false,
-      status: dto.status ?? 'completed',
-      genres: this.pickGenres(dto.genreIds),
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.data.anime.push(anime);
-    this.data.save();
-    return this.enrichAnime(anime.id);
-  }
-
-  update(id: string, dto: UpdateAnimeDto) {
-    // Partial updates only touch fields present in the payload.
-    const anime = this.data.findAnimeById(id);
+  async findOne(id: string) {
+    const anime = await this.prisma.anime.findUnique({
+      where: { id },
+      select: { ...LIST_SELECT, alternativeTitles: true, externalIds: true, _count: { select: { dubReports: true } } },
+    });
     if (!anime) {
       throw new NotFoundException('Anime not found');
     }
 
-    if (dto.title !== undefined) anime.title = dto.title;
-    if (dto.description !== undefined) anime.description = dto.description;
-    if (dto.coverImageUrl !== undefined) anime.coverImageUrl = dto.coverImageUrl;
-    if (dto.releaseYear !== undefined) anime.releaseYear = dto.releaseYear;
-    if (dto.hasDub !== undefined) anime.hasDub = dto.hasDub;
-    if (dto.status !== undefined) anime.status = dto.status;
-    if (dto.genreIds !== undefined) anime.genres = this.pickGenres(dto.genreIds);
-    anime.updatedAt = new Date();
-
-    this.data.save();
-    return this.enrichAnime(id);
+    // The detail view adds the alternative titles and outbound IDs the list leaves out.
+    return {
+      ...this.toListItem(anime),
+      alternativeTitles: anime.alternativeTitles,
+      externalIds: anime.externalIds,
+      dubReports: anime._count.dubReports,
+    };
   }
 
-  remove(id: string) {
-    // Removing an anime also clears its ratings, comments, and comment votes so no
-    // orphaned records stay behind in the datastore.
-    const index = this.data.anime.findIndex((anime) => anime.id === id);
-    if (index === -1) {
+  async listGenres() {
+    return { items: await this.prisma.genre.findMany({ orderBy: { name: 'asc' } }) };
+  }
+
+  async create(dto: CreateAnimeDto) {
+    const genreIds = await this.checkGenres(dto.genreIds);
+    const anime = await this.prisma.anime.create({
+      data: {
+        id: randomUUID(),
+        title: dto.title,
+        sortTitle: sortTitleOf(dto.title),
+        searchText: buildSearchText(dto.title, []),
+        description: dto.description ?? '',
+        coverImageUrl: dto.coverImageUrl ?? null,
+        releaseYear: dto.releaseYear ?? null,
+        hasDub: dto.hasDub ?? false,
+        status: dto.status ?? 'completed',
+        genres: { create: genreIds.map((genreId) => ({ genreId })) },
+      },
+      select: { id: true },
+    });
+
+    return this.findOne(anime.id);
+  }
+
+  async update(id: string, dto: UpdateAnimeDto) {
+    // Partial updates only touch fields present in the payload.
+    const existing = await this.prisma.anime.findUnique({ where: { id }, select: { alternativeTitles: true } });
+    if (!existing) {
       throw new NotFoundException('Anime not found');
     }
 
-    this.data.anime.splice(index, 1);
-    const commentIds = new Set(
-      this.data.comments.filter((comment) => comment.animeId === id).map((comment) => comment.id),
-    );
-    removeWhere(this.data.ratings, (rating) => rating.animeId === id);
-    removeWhere(this.data.comments, (comment) => commentIds.has(comment.id));
-    removeWhere(this.data.commentLikes, (like) => commentIds.has(like.commentId));
+    const genreIds = dto.genreIds === undefined ? undefined : await this.checkGenres(dto.genreIds);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.anime.update({
+        where: { id },
+        data: {
+          ...(dto.title !== undefined
+            ? { title: dto.title, sortTitle: sortTitleOf(dto.title), searchText: buildSearchText(dto.title, existing.alternativeTitles) }
+            : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.coverImageUrl !== undefined ? { coverImageUrl: dto.coverImageUrl } : {}),
+          ...(dto.releaseYear !== undefined ? { releaseYear: dto.releaseYear } : {}),
+          ...(dto.hasDub !== undefined ? { hasDub: dto.hasDub } : {}),
+          ...(dto.status !== undefined ? { status: dto.status } : {}),
+        },
+      });
 
-    this.data.save();
+      if (genreIds !== undefined) {
+        await tx.animeGenre.deleteMany({ where: { animeId: id } });
+        await tx.animeGenre.createMany({ data: genreIds.map((genreId) => ({ animeId: id, genreId })) });
+      }
+
+      // A confirmed dub settles any open reports asking for one.
+      if (dto.hasDub === true) {
+        await tx.dubReport.deleteMany({ where: { animeId: id } });
+      }
+    });
+
+    return this.findOne(id);
+  }
+
+  async remove(id: string) {
+    // Ratings, notes, note votes, dub reports and genre links cascade with the anime.
+    const { count } = await this.prisma.anime.deleteMany({ where: { id } });
+    if (count === 0) {
+      throw new NotFoundException('Anime not found');
+    }
+
     return { message: 'Anime deleted' };
   }
 
-  private enrichAnime(id: string) {
-    // The frontend expects derived stats on the anime object, so we compute them here once.
-    const anime = this.data.findAnimeById(id);
-    if (!anime) {
-      throw new NotFoundException('Anime not found');
+  // Search ranks in the application: every match's names are compared with the
+  // search, which SQL cannot order by cheaply. The trigram index keeps the match set
+  // small, and the names come already folded in search_text, so only a few short
+  // columns are read before the page itself is loaded.
+  private async findByRelevance(where: Prisma.AnimeWhereInput, needle: string, skip: number, take: number) {
+    const matches = await this.prisma.anime.findMany({
+      where,
+      select: { id: true, title: true, sortTitle: true, searchText: true, totalVotes: true, popularity: true },
+    });
+
+    const ranked = matches
+      .map((anime) => ({ anime, tier: this.matchTier(anime.title, anime.searchText, needle) }))
+      .sort(
+        (left, right) =>
+          left.tier - right.tier ||
+          (right.anime.popularity ?? -1) - (left.anime.popularity ?? -1) ||
+          right.anime.totalVotes - left.anime.totalVotes ||
+          // Among equal matches the shorter title is usually the main series rather
+          // than one of its arcs, films or specials.
+          left.anime.title.length - right.anime.title.length ||
+          left.anime.sortTitle.localeCompare(right.anime.sortTitle),
+      );
+
+    const pageIds = ranked.slice(skip, skip + take).map((entry) => entry.anime.id);
+    const pageRows = await this.prisma.anime.findMany({ where: { id: { in: pageIds } }, select: LIST_SELECT });
+    const byId = new Map(pageRows.map((row) => [row.id, row]));
+
+    return { total: matches.length, rows: pageIds.map((id) => byId.get(id)).filter((row): row is ListRow => Boolean(row)) };
+  }
+
+  // Lower is better. An exact title wins outright; an exact alternative title ranks
+  // with a title that starts with the search, and so on down. Within a tier the more
+  // popular work comes first, so a parody listing "Attack on Titan" among its names
+  // falls below the real seasons.
+  private matchTier(title: string, searchText: string, needle: string) {
+    const score = (key: string) =>
+      key === needle ? 0 : key.startsWith(needle) ? 1 : ` ${key} `.includes(` ${needle} `) ? 2 : key.includes(needle) ? 3 : 9;
+
+    const titleKey = searchKey(title);
+    const alternativeKeys = searchText.split(' | ').filter((key) => key !== titleKey);
+    return Math.min(score(titleKey), Math.min(9, ...alternativeKeys.map(score)) + 1);
+  }
+
+  // Every order ends on the A-Z title, so ties are stable from page to page.
+  private orderBy(sortBy: string, order: 'asc' | 'desc'): Prisma.AnimeOrderByWithRelationInput[] {
+    const byTitle: Prisma.AnimeOrderByWithRelationInput[] = [{ sortTitle: 'asc' }, { id: 'asc' }];
+
+    switch (sortBy) {
+      case 'popular':
+        // Titles with no popularity figure go last; AniRate's own votes break ties.
+        return [{ popularity: { sort: order, nulls: 'last' } }, { totalVotes: 'desc' }, ...byTitle];
+      case 'rating':
+        // A title ranks by its better version: how good it is watched the right way.
+        return [{ bestRating: { sort: order, nulls: 'last' } }, { totalVotes: 'desc' }, ...byTitle];
+      case 'votes':
+        return [{ totalVotes: order }, ...byTitle];
+      case 'year':
+        // Titles with no known year go last whichever way the list runs.
+        return [{ releaseYear: { sort: order, nulls: 'last' } }, ...byTitle];
+      default:
+        return order === 'desc' ? [{ sortTitle: 'desc' }, { id: 'desc' }] : byTitle;
     }
+  }
 
-    const ratings = this.data.ratings.filter((entry) => entry.animeId === anime.id);
-    const subRatings = ratings
-      .map((entry) => entry.subRating)
-      .filter((value): value is number => value !== null);
-    const dubRatings = ratings
-      .map((entry) => entry.dubRating)
-      .filter((value): value is number => value !== null);
-
+  private toListItem(row: ListRow) {
     return {
-      id: anime.id,
-      title: anime.title,
-      description: anime.description,
-      coverImageUrl: anime.coverImageUrl,
-      releaseYear: anime.releaseYear,
-      hasDub: anime.hasDub,
-      status: anime.status,
-      avgSubRating: this.average(subRatings),
-      avgDubRating: this.average(dubRatings),
-      totalVotes: ratings.length,
-      genres: anime.genres,
-      createdAt: anime.createdAt,
-      updatedAt: anime.updatedAt,
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      coverImageUrl: row.coverImageUrl,
+      releaseYear: row.releaseYear,
+      hasDub: row.hasDub,
+      status: row.status,
+      format: row.format,
+      episodes: row.episodes,
+      popularity: row.popularity,
+      avgSubRating: row.avgSubRating,
+      avgDubRating: row.avgDubRating,
+      totalVotes: row.totalVotes,
+      genres: row.genres.map((entry) => entry.genre),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     };
   }
 
-  private average(values: number[]) {
-    if (values.length === 0) {
-      return null;
-    }
-
-    const sum = values.reduce((total, value) => total + value, 0);
-    return Number((sum / values.length).toFixed(2));
-  }
-
-  private pickGenres(genreIds: number[] | undefined) {
+  private async checkGenres(genreIds: number[] | undefined) {
     if (!genreIds || genreIds.length === 0) {
       return [];
     }
 
-    // Genres come from the canonical genre list, not from whatever other anime happen
-    // to use, so a genre with no titles yet can still be assigned.
-    const picked = this.data.genres.filter((genre) => genreIds.includes(genre.id));
-    if (picked.length !== genreIds.length) {
-      const known = new Set(picked.map((genre) => genre.id));
-      const unknown = genreIds.filter((genreId) => !known.has(genreId));
+    // Genres come from the canonical genre list, so a genre with no titles yet can
+    // still be assigned, and an unknown id is an error rather than silently dropped.
+    const known = new Set(
+      (await this.prisma.genre.findMany({ where: { id: { in: genreIds } }, select: { id: true } })).map((genre) => genre.id),
+    );
+    const unknown = genreIds.filter((genreId) => !known.has(genreId));
+    if (unknown.length) {
       throw new BadRequestException(`Unknown genre id(s): ${unknown.join(', ')}`);
     }
 
-    return picked.map((genre) => ({ ...genre }));
+    return genreIds;
   }
 }

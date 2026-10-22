@@ -1,5 +1,4 @@
-// The root module wires together the local file-backed datastore and all feature
-// modules that make up the current runnable development version of AniRate.
+// The root module wires the PostgreSQL client and every feature module together.
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
@@ -10,8 +9,9 @@ import { AdminModule } from './admin/admin.module';
 import { AnimeModule } from './anime/anime.module';
 import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 import { CommentsModule } from './comments/comments.module';
+import { PrismaModule } from './common/prisma/prisma.module';
 import { validateEnvironment } from './config/environment.validation';
-import { DataModule } from './data/data.module';
+import { DubReportsModule } from './dub-reports/dub-reports.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { RatingsModule } from './ratings/ratings.module';
 
@@ -28,11 +28,12 @@ import { RatingsModule } from './ratings/ratings.module';
         limit: 100,
       },
     ]),
-    DataModule,
+    PrismaModule,
     MonitoringModule,
     AuthModule,
     AnimeModule,
     RatingsModule,
+    DubReportsModule,
     CommentsModule,
     AdminModule,
   ],

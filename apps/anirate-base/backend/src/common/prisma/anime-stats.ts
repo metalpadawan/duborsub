@@ -1,39 +1,61 @@
-// These helpers keep anime aggregate ratings consistent whenever a rating changes.
-// Prisma `db push` does not recreate the SQL triggers from the archived schema file,
-// so the application recalculates the summary columns directly.
-import { PrismaService } from './prisma.service';
+// Rating totals live on the anime row so lists can sort by them in SQL. They are
+// recomputed from the ratings table inside the same transaction as every rating
+// change, with the anime row locked so two simultaneous ratings cannot both write
+// totals that miss the other.
+import { Prisma, PrismaClient } from '@prisma/client';
 
-export async function refreshAnimeStats(prisma: PrismaService, animeId: string) {
-  const ratings = await prisma.rating.findMany({
+// The lock comes before the rating write: inserting a rating takes a shared lock on
+// the anime row through its foreign key, and upgrading that afterwards deadlocks
+// against a second rating doing the same.
+function lockAnime(tx: Prisma.TransactionClient, animeId: string) {
+  return tx.$queryRaw`SELECT id FROM anime WHERE id = ${animeId} FOR UPDATE`;
+}
+
+export async function refreshAnimeStats(tx: Prisma.TransactionClient, animeId: string) {
+  await lockAnime(tx, animeId);
+
+  const totals = await tx.rating.aggregate({
     where: { animeId },
-    select: {
-      subRating: true,
-      dubRating: true,
-    },
+    _sum: { subRating: true, dubRating: true },
+    _count: { subRating: true, dubRating: true, _all: true },
   });
 
-  const subRatings = ratings
-    .map((rating) => rating.subRating)
-    .filter((value): value is number => value !== null);
-  const dubRatings = ratings
-    .map((rating) => rating.dubRating)
-    .filter((value): value is number => value !== null);
+  const subSum = totals._sum.subRating ?? 0;
+  const dubSum = totals._sum.dubRating ?? 0;
+  const subCount = totals._count.subRating;
+  const dubCount = totals._count.dubRating;
+  const avgSubRating = average(subSum, subCount);
+  const avgDubRating = average(dubSum, dubCount);
 
-  await prisma.anime.update({
+  await tx.anime.update({
     where: { id: animeId },
     data: {
-      avgSubRating: average(subRatings),
-      avgDubRating: average(dubRatings),
-      totalVotes: ratings.length,
+      subSum,
+      subCount,
+      dubSum,
+      dubCount,
+      totalVotes: totals._count._all,
+      avgSubRating,
+      avgDubRating,
+      bestRating: avgSubRating === null && avgDubRating === null ? null : Math.max(avgSubRating ?? 0, avgDubRating ?? 0),
     },
   });
 }
 
-function average(values: number[]) {
-  if (values.length === 0) {
-    return null;
-  }
+/** Runs a rating change and the recount in one transaction. */
+export function withAnimeStats<T>(
+  prisma: PrismaClient,
+  animeId: string,
+  change: (tx: Prisma.TransactionClient) => Promise<T>,
+) {
+  return prisma.$transaction(async (tx) => {
+    await lockAnime(tx, animeId);
+    const result = await change(tx);
+    await refreshAnimeStats(tx, animeId);
+    return result;
+  });
+}
 
-  const total = values.reduce((sum, value) => sum + value, 0);
-  return Number((total / values.length).toFixed(2));
+function average(sum: number, count: number) {
+  return count === 0 ? null : Number((sum / count).toFixed(2));
 }

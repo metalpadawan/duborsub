@@ -69,7 +69,10 @@ const environmentSchema = z.object({
   COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
   COOKIE_SECURE: z.preprocess(parseBoolean, z.boolean()).optional(),
   TRUST_PROXY: z.preprocess(parseBoolean, z.boolean()).default(false),
-  DATA_FILE: z.string().trim().min(1).optional(),
+  DATABASE_URL: z
+    .string()
+    .trim()
+    .refine((value) => /^postgres(ql)?:\/\//.test(value), 'DATABASE_URL must be a postgresql:// connection string'),
   EXPOSE_RESET_TOKEN:z.preprocess(parseBoolean, z.boolean()).default(false),
   SEED_ADMIN_EMAIL: z.string().trim().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().min(12, 'SEED_ADMIN_PASSWORD must be at least 12 characters long').optional(),

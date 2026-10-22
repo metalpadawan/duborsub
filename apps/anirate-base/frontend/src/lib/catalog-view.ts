@@ -1,10 +1,17 @@
 import type { Anime } from '@/lib/api';
 
-export type SortKey = 'title' | 'rating' | 'votes' | 'year';
+// Next types page config narrowly; this keeps the zero-JS flag type-checked.
+export type ZeroJsPageConfig = { unstable_runtimeJS: false; runtime?: 'nodejs' };
 
-export const PAGE_SIZE = 4;
+// 'relevance' only applies to a search, where it is the default order; browsing
+// starts on 'popular'. 'rating' is the rankings: rated titles only.
+export type SortKey = 'relevance' | 'popular' | 'title' | 'rating' | 'votes' | 'year';
+
+export const PAGE_SIZE = 20;
 
 export const sortLabels: Record<SortKey, string> = {
+  relevance: 'Best match',
+  popular: 'Popular',
   title: 'A-Z',
   rating: 'Top Rated',
   votes: 'Most Voted',
@@ -17,17 +24,22 @@ export type HomeProps = {
   genre: string;
   genres: string[];
   items: Anime[];
+  featured: Anime | null;
   page: number;
   totalItems: number;
   totalPages: number;
 };
+
+export function defaultSortFor(search: string): SortKey {
+  return search ? 'relevance' : 'popular';
+}
 
 export function getSingleQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
 }
 
 export function isSortKey(value: string): value is SortKey {
-  return value === 'title' || value === 'rating' || value === 'votes' || value === 'year';
+  return ['relevance', 'popular', 'title', 'rating', 'votes', 'year'].includes(value);
 }
 
 export function parseCatalogPage(value: string) {

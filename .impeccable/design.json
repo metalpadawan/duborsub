@@ -1,0 +1,566 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21T15:43:09.881Z",
+  "title": "Design System: AniRate",
+  "extensions": {
+    "colorMeta": {
+      "klein": {
+        "role": "primary",
+        "displayName": "International Klein Blue",
+        "canonical": "oklch(37.9% 0.195 263.2)",
+        "tonalRamp": [
+          "oklch(15.0% 0.195 263.2)",
+          "oklch(26.4% 0.195 263.2)",
+          "oklch(37.9% 0.195 263.2)",
+          "oklch(49.3% 0.195 263.2)",
+          "oklch(60.7% 0.195 263.2)",
+          "oklch(72.1% 0.195 263.2)",
+          "oklch(83.6% 0.195 263.2)",
+          "oklch(95.0% 0.195 263.2)"
+        ]
+      },
+      "klein-deep": {
+        "role": "primary",
+        "displayName": "Klein Deep",
+        "canonical": "oklch(31.0% 0.156 263.0)",
+        "tonalRamp": [
+          "oklch(15.0% 0.156 263.0)",
+          "oklch(26.4% 0.156 263.0)",
+          "oklch(37.9% 0.156 263.0)",
+          "oklch(49.3% 0.156 263.0)",
+          "oklch(60.7% 0.156 263.0)",
+          "oklch(72.1% 0.156 263.0)",
+          "oklch(83.6% 0.156 263.0)",
+          "oklch(95.0% 0.156 263.0)"
+        ]
+      },
+      "klein-wash": {
+        "role": "primary",
+        "displayName": "Klein Wash",
+        "canonical": "rgb(0 47 167 / 0.07)",
+        "tonalRamp": [
+          "oklch(15.0% 0.195 263.2)",
+          "oklch(26.4% 0.195 263.2)",
+          "oklch(37.9% 0.195 263.2)",
+          "oklch(49.3% 0.195 263.2)",
+          "oklch(60.7% 0.195 263.2)",
+          "oklch(72.1% 0.195 263.2)",
+          "oklch(83.6% 0.195 263.2)",
+          "oklch(95.0% 0.195 263.2)"
+        ]
+      },
+      "wall": {
+        "role": "neutral",
+        "displayName": "Plaster Wall",
+        "canonical": "oklch(96.4% 0.003 106.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.003 106.4)",
+          "oklch(26.4% 0.003 106.4)",
+          "oklch(37.9% 0.003 106.4)",
+          "oklch(49.3% 0.003 106.4)",
+          "oklch(60.7% 0.003 106.4)",
+          "oklch(72.1% 0.003 106.4)",
+          "oklch(83.6% 0.003 106.4)",
+          "oklch(95.0% 0.003 106.4)"
+        ]
+      },
+      "wall-2": {
+        "role": "neutral",
+        "displayName": "Shadowed Plaster",
+        "canonical": "oklch(93.3% 0.004 106.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.004 106.5)",
+          "oklch(26.4% 0.004 106.5)",
+          "oklch(37.9% 0.004 106.5)",
+          "oklch(49.3% 0.004 106.5)",
+          "oklch(60.7% 0.004 106.5)",
+          "oklch(72.1% 0.004 106.5)",
+          "oklch(83.6% 0.004 106.5)",
+          "oklch(95.0% 0.004 106.5)"
+        ]
+      },
+      "wall-3": {
+        "role": "neutral",
+        "displayName": "Dust Grey",
+        "canonical": "oklch(89.3% 0.007 106.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 106.5)",
+          "oklch(26.4% 0.007 106.5)",
+          "oklch(37.9% 0.007 106.5)",
+          "oklch(49.3% 0.007 106.5)",
+          "oklch(60.7% 0.007 106.5)",
+          "oklch(72.1% 0.007 106.5)",
+          "oklch(83.6% 0.007 106.5)",
+          "oklch(95.0% 0.007 106.5)"
+        ]
+      },
+      "field": {
+        "role": "neutral",
+        "displayName": "Fresh Card",
+        "canonical": "oklch(98.8% 0.001 0.0)",
+        "tonalRamp": [
+          "oklch(15.0% 0.001 0.0)",
+          "oklch(26.4% 0.001 0.0)",
+          "oklch(37.9% 0.001 0.0)",
+          "oklch(49.3% 0.001 0.0)",
+          "oklch(60.7% 0.001 0.0)",
+          "oklch(72.1% 0.001 0.0)",
+          "oklch(83.6% 0.001 0.0)",
+          "oklch(95.0% 0.001 0.0)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Gallery Black",
+        "canonical": "oklch(17.8% 0.000 0.0)",
+        "tonalRamp": [
+          "oklch(15.0% 0.000 0.0)",
+          "oklch(26.4% 0.000 0.0)",
+          "oklch(37.9% 0.000 0.0)",
+          "oklch(49.3% 0.000 0.0)",
+          "oklch(60.7% 0.000 0.0)",
+          "oklch(72.1% 0.000 0.0)",
+          "oklch(83.6% 0.000 0.0)",
+          "oklch(95.0% 0.000 0.0)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Label Ink",
+        "canonical": "oklch(35.2% 0.003 106.6)",
+        "tonalRamp": [
+          "oklch(15.0% 0.003 106.6)",
+          "oklch(26.4% 0.003 106.6)",
+          "oklch(37.9% 0.003 106.6)",
+          "oklch(49.3% 0.003 106.6)",
+          "oklch(60.7% 0.003 106.6)",
+          "oklch(72.1% 0.003 106.6)",
+          "oklch(83.6% 0.003 106.6)",
+          "oklch(95.0% 0.003 106.6)"
+        ]
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "oklch(51.6% 0.005 106.6)",
+        "tonalRamp": [
+          "oklch(15.0% 0.005 106.6)",
+          "oklch(26.4% 0.005 106.6)",
+          "oklch(37.9% 0.005 106.6)",
+          "oklch(49.3% 0.005 106.6)",
+          "oklch(60.7% 0.005 106.6)",
+          "oklch(72.1% 0.005 106.6)",
+          "oklch(83.6% 0.005 106.6)",
+          "oklch(95.0% 0.005 106.6)"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgb(17 17 17 / 0.12)",
+        "tonalRamp": [
+          "oklch(15.0% 0.000 0.0)",
+          "oklch(26.4% 0.000 0.0)",
+          "oklch(37.9% 0.000 0.0)",
+          "oklch(49.3% 0.000 0.0)",
+          "oklch(60.7% 0.000 0.0)",
+          "oklch(72.1% 0.000 0.0)",
+          "oklch(83.6% 0.000 0.0)",
+          "oklch(95.0% 0.000 0.0)"
+        ]
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "rgb(17 17 17 / 0.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.000 0.0)",
+          "oklch(26.4% 0.000 0.0)",
+          "oklch(37.9% 0.000 0.0)",
+          "oklch(49.3% 0.000 0.0)",
+          "oklch(60.7% 0.000 0.0)",
+          "oklch(72.1% 0.000 0.0)",
+          "oklch(83.6% 0.000 0.0)",
+          "oklch(95.0% 0.000 0.0)"
+        ]
+      },
+      "on-klein": {
+        "role": "neutral",
+        "displayName": "Paper White",
+        "canonical": "oklch(100.0% 0.000 0.0)",
+        "tonalRamp": [
+          "oklch(15.0% 0.000 0.0)",
+          "oklch(26.4% 0.000 0.0)",
+          "oklch(37.9% 0.000 0.0)",
+          "oklch(49.3% 0.000 0.0)",
+          "oklch(60.7% 0.000 0.0)",
+          "oklch(72.1% 0.000 0.0)",
+          "oklch(83.6% 0.000 0.0)",
+          "oklch(95.0% 0.000 0.0)"
+        ]
+      },
+      "on-ink": {
+        "role": "neutral",
+        "displayName": "Plaster on Black",
+        "canonical": "oklch(96.4% 0.003 106.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.003 106.4)",
+          "oklch(26.4% 0.003 106.4)",
+          "oklch(37.9% 0.003 106.4)",
+          "oklch(49.3% 0.003 106.4)",
+          "oklch(60.7% 0.003 106.4)",
+          "oklch(72.1% 0.003 106.4)",
+          "oklch(83.6% 0.003 106.4)",
+          "oklch(95.0% 0.003 106.4)"
+        ]
+      },
+      "on-ink-2": {
+        "role": "neutral",
+        "displayName": "Dimmed Plaster",
+        "canonical": "rgb(243 243 241 / 0.68)",
+        "tonalRamp": [
+          "oklch(15.0% 0.003 106.4)",
+          "oklch(26.4% 0.003 106.4)",
+          "oklch(37.9% 0.003 106.4)",
+          "oklch(49.3% 0.003 106.4)",
+          "oklch(60.7% 0.003 106.4)",
+          "oklch(72.1% 0.003 106.4)",
+          "oklch(83.6% 0.003 106.4)",
+          "oklch(95.0% 0.003 106.4)"
+        ]
+      },
+      "danger": {
+        "role": "error",
+        "displayName": "Conservator's Red",
+        "canonical": "oklch(46.5% 0.163 28.8)",
+        "tonalRamp": [
+          "oklch(15.0% 0.163 28.8)",
+          "oklch(26.4% 0.163 28.8)",
+          "oklch(37.9% 0.163 28.8)",
+          "oklch(49.3% 0.163 28.8)",
+          "oklch(60.7% 0.163 28.8)",
+          "oklch(72.1% 0.163 28.8)",
+          "oklch(83.6% 0.163 28.8)",
+          "oklch(95.0% 0.163 28.8)"
+        ]
+      },
+      "danger-wash": {
+        "role": "error",
+        "displayName": "Red Wash",
+        "canonical": "rgb(161 35 27 / 0.06)",
+        "tonalRamp": [
+          "oklch(15.0% 0.163 28.8)",
+          "oklch(26.4% 0.163 28.8)",
+          "oklch(37.9% 0.163 28.8)",
+          "oklch(49.3% 0.163 28.8)",
+          "oklch(60.7% 0.163 28.8)",
+          "oklch(72.1% 0.163 28.8)",
+          "oklch(83.6% 0.163 28.8)",
+          "oklch(95.0% 0.163 28.8)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The home headline and the colophon invitation, set in two short stacked lines."
+      },
+      "title-xl": {
+        "displayName": "Headline",
+        "purpose": "A work's title on its page and the vacant page title."
+      },
+      "title-l": {
+        "displayName": "Title Large",
+        "purpose": "The collection heading and auth form headings."
+      },
+      "title-m": {
+        "displayName": "Title",
+        "purpose": "Section heads on the work page and empty-state lines."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "The one-line offer under a display headline, max 38ch, Label Ink."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Interface text at the reading width (wdth 100)."
+      },
+      "prose": {
+        "displayName": "Prose",
+        "purpose": "Synopses and long notes, max 62ch, Label Ink."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Provenance, captions, counts, and the colophon foot, in Graphite."
+      },
+      "signage": {
+        "displayName": "Signage",
+        "purpose": "Uppercase expanded wall-label lettering for field labels, measure names, column heads, and control names; never an eyebrow."
+      },
+      "measure": {
+        "displayName": "Measure",
+        "purpose": "Tabular score figures; this size is the work-page split, with 1.125rem in lists and 2rem on the hero wall label."
+      }
+    },
+    "shadows": [
+      {
+        "name": "hung",
+        "value": "0 1px 1px rgb(17 17 17 / 0.06), 0 2px 4px rgb(17 17 17 / 0.06), 0 22px 44px -18px rgb(17 17 17 / 0.34)",
+        "purpose": "A work hung large on the wall (home hero, work page); arrives last in the hang."
+      },
+      {
+        "name": "lifted",
+        "value": "0 1px 1px rgb(17 17 17 / 0.08), 0 10px 22px -10px rgb(17 17 17 / 0.4)",
+        "purpose": "A checklist thumbnail on row hover, with a 2px rise."
+      },
+      {
+        "name": "search-focus",
+        "value": "0 0 0 1px #111111, 0 14px 30px -18px rgb(17 17 17 / 0.45)",
+        "purpose": "The search field while focused; the one state-driven lift in the chrome."
+      },
+      {
+        "name": "masthead-frost",
+        "value": "backdrop-filter: saturate(1.4) blur(14px) over rgb(243 243 241 / 0.86)",
+        "purpose": "The sticky masthead, the only frosted surface."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default easing for state changes, draws, and entrances."
+      },
+      {
+        "name": "ease-in-out",
+        "value": "cubic-bezier(0.65, 0, 0.35, 1)",
+        "purpose": "The top-down unveil in the hang and the skeleton breathe."
+      },
+      {
+        "name": "t-fast",
+        "value": "140ms",
+        "purpose": "Colour shifts on tabs and text actions, press scales."
+      },
+      {
+        "name": "t-base",
+        "value": "220ms",
+        "purpose": "Button, field, link-underline, tab-underline, and tile-fill transitions."
+      },
+      {
+        "name": "t-slow",
+        "value": "480ms",
+        "purpose": "Notice arrival, brand-mark turn, distribution bars."
+      },
+      {
+        "name": "measure-draw",
+        "value": "900ms ease-out, scaleX 0 to value/5 (1000ms inside the hang; dub 140-160ms behind sub)",
+        "purpose": "Measure tracks drawing in; the work page entrance."
+      },
+      {
+        "name": "the-hang",
+        "value": "canvas unveil clip-path 1100ms ease-in-out from 150ms; image settle scale 1.08 to 1 over 1600ms; hung shadow 1100ms from 650ms; label lines 700ms from 900ms, 80ms apart; measures from 1150ms",
+        "purpose": "The home hero entrance, the one authored moment on that page; hero copy rises (800ms, 80ms stagger) in the same beat."
+      },
+      {
+        "name": "view-transition",
+        "value": "old root fades 180ms; new root rises 12px over 420ms; shared groups 560ms ease-out",
+        "purpose": "Cross-document navigation; work-<id> names morph a thumbnail into the hung work; masthead and ink-wall names hold still."
+      },
+      {
+        "name": "entry-arrive",
+        "value": "animation-timeline: view(); range entry 0% to entry 55%; 18px rise and fade",
+        "purpose": "Checklist rows arriving on scroll where supported."
+      },
+      {
+        "name": "skeleton-breathe",
+        "value": "1600ms ease-in-out infinite alternate, opacity 1 to 0.55",
+        "purpose": "Loading blocks in the final layout."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "@view-transition navigation none; animations 1ms with no delay; scroll arrival, hover lift, press scale, and arrow nudge removed",
+        "purpose": "Movement goes, meaning stays: colour and fill changes still confirm actions."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1100px"
+      },
+      {
+        "name": "tablet",
+        "value": "860px"
+      },
+      {
+        "name": "narrow",
+        "value": "720px"
+      },
+      {
+        "name": "phone",
+        "value": "480px"
+      },
+      {
+        "name": "no-hover",
+        "value": "(hover: none)"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Ink Button",
+      "kind": "button",
+      "refersTo": "button-ink",
+      "description": "The primary action: gallery black, square, turning Klein on hover.",
+      "html": "<a class=\"ds-btn-ink\" href=\"#\">Back to the collection <svg class=\"ds-btn-ink__arrow\" width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"square\" aria-hidden=\"true\"><path d=\"M2.5 8h10.5M9 4l4 4-4 4\"/></svg></a>",
+      "css": ".ds-btn-ink { display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; min-height: 3rem; padding: 0 1.35rem; border: 1px solid transparent; border-radius: 0; font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); font-size: 0.9375rem; font-weight: 600; line-height: 1; letter-spacing: 0.005em; white-space: nowrap; text-decoration: none; cursor: pointer; transition: background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1), color 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 140ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ink:focus-visible { outline: 2px solid var(--klein, #002fa7); outline-offset: 3px; } .ds-btn-ink:active { transform: scale(0.98); } .ds-btn-ink { background: var(--ink, #111111); color: var(--wall, #f3f3f1); } .ds-btn-ink:hover { background: var(--klein, #002fa7); } .ds-btn-ink__arrow { transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ink:hover .ds-btn-ink__arrow { transform: translateX(3px); }"
+    },
+    {
+      "name": "Line Button",
+      "kind": "button",
+      "refersTo": "button-line",
+      "description": "The secondary action: a strong hairline outline that firms to ink over shadowed plaster.",
+      "html": "<a class=\"ds-btn-line\" href=\"#\">Clear filters</a>",
+      "css": ".ds-btn-line { display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; min-height: 3rem; padding: 0 1.35rem; border: 1px solid transparent; border-radius: 0; font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); font-size: 0.9375rem; font-weight: 600; line-height: 1; letter-spacing: 0.005em; white-space: nowrap; text-decoration: none; cursor: pointer; transition: background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1), color 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 140ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-line:focus-visible { outline: 2px solid var(--klein, #002fa7); outline-offset: 3px; } .ds-btn-line:active { transform: scale(0.98); } .ds-btn-line { min-height: 2.5rem; padding: 0 1rem; font-size: 0.875rem; background: transparent; border-color: var(--rule-strong, rgb(17 17 17 / 0.3)); color: var(--ink, #111111); } .ds-btn-line:hover { border-color: var(--ink, #111111); background: var(--wall-2, #e9e9e6); }"
+    },
+    {
+      "name": "Buttons on the Black Wall",
+      "kind": "button",
+      "refersTo": "button-white",
+      "description": "The colophon pair: a plaster button that goes Klein on hover, beside a plaster outline.",
+      "html": "<div class=\"ds-blackwall\"><a class=\"ds-btn-white\" href=\"#\">Create an account</a><a class=\"ds-btn-outline\" href=\"#\">Sign in</a></div>",
+      "css": ".ds-blackwall { display: flex; flex-wrap: wrap; gap: 0.75rem; padding: 2rem; background: var(--ink, #111111); } .ds-btn-white { display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; min-height: 3rem; padding: 0 1.35rem; border: 1px solid transparent; border-radius: 0; font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); font-size: 0.9375rem; font-weight: 600; line-height: 1; letter-spacing: 0.005em; white-space: nowrap; text-decoration: none; cursor: pointer; transition: background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1), color 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 140ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-white:focus-visible { outline: 2px solid var(--klein, #002fa7); outline-offset: 3px; } .ds-btn-white:active { transform: scale(0.98); } .ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; min-height: 3rem; padding: 0 1.35rem; border: 1px solid transparent; border-radius: 0; font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); font-size: 0.9375rem; font-weight: 600; line-height: 1; letter-spacing: 0.005em; white-space: nowrap; text-decoration: none; cursor: pointer; transition: background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1), color 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 140ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-outline:focus-visible { outline: 2px solid var(--klein, #002fa7); outline-offset: 3px; } .ds-btn-outline:active { transform: scale(0.98); } .ds-btn-white { background: var(--on-ink, #f3f3f1); color: var(--ink, #111111); } .ds-btn-white:hover { background: var(--klein, #002fa7); color: var(--on-klein, #ffffff); } .ds-btn-outline { border-color: rgb(243 243 241 / 0.4); color: var(--on-ink, #f3f3f1); } .ds-btn-outline:hover { border-color: var(--on-ink, #f3f3f1); background: rgb(243 243 241 / 0.08); } .ds-blackwall .ds-btn-white:focus-visible, .ds-blackwall .ds-btn-outline:focus-visible { outline-color: var(--on-ink, #f3f3f1); }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A square field on fresh card, labelled in signage; focus draws a Klein bar inside the bottom edge.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field__label\" for=\"ds-email\">Email</label><input id=\"ds-email\" class=\"ds-input\" type=\"email\" placeholder=\"you@example.com\"></div>",
+      "css": ".ds-field { display: grid; gap: 0.5rem; max-width: 26rem; font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); } .ds-field__label { font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); font-size: 0.6875rem; line-height: 1rem; font-weight: 640; letter-spacing: 0.08em; text-transform: uppercase; font-variation-settings: 'wdth' 125; } .ds-field__label { color: var(--ink-2, #3b3b39); } .ds-input { width: 100%; min-height: 3.25rem; padding: 0 1rem; border: 1px solid var(--rule-strong, rgb(17 17 17 / 0.3)); border-radius: 0; background: var(--field, #fbfbfa); color: var(--ink, #111111); font: inherit; font-size: 1rem; outline: none; caret-color: var(--klein, #002fa7); transition: border-color 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input::placeholder { color: var(--graphite, #686865); } .ds-input:hover { border-color: var(--ink-2, #3b3b39); } .ds-input:focus { border-color: var(--ink, #111111); box-shadow: inset 0 -2px 0 var(--klein, #002fa7); } .ds-input[aria-invalid='true'] { border-color: var(--danger, #a1231b); }"
+    },
+    {
+      "name": "Search: the Room Index",
+      "kind": "input",
+      "refersTo": "search",
+      "description": "The hero search: an ink-ruled field with a flush ink button, lifting on focus, with the \"/\" shortcut hint.",
+      "html": "<form class=\"ds-search-wrap\" role=\"search\" onsubmit=\"return false\"><label class=\"ds-search__label\" for=\"ds-q\">Search the collection</label><div class=\"ds-search\"><input id=\"ds-q\" class=\"ds-search__input\" type=\"search\" placeholder=\"Search by title\" aria-keyshortcuts=\"/\"><button class=\"ds-search__btn\" type=\"submit\">Search</button></div><p class=\"ds-search__hint\">Press <kbd class=\"ds-kbd\">/</kbd> to search from anywhere on the page.</p></form>",
+      "css": ".ds-search-wrap { display: grid; gap: 0.75rem; max-width: 34rem; font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); color: var(--ink, #111111); } .ds-search__label { font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); font-size: 0.6875rem; line-height: 1rem; font-weight: 640; letter-spacing: 0.08em; text-transform: uppercase; font-variation-settings: 'wdth' 125; } .ds-search__label { color: var(--ink-2, #3b3b39); } .ds-search { display: flex; border: 1px solid var(--ink, #111111); background: var(--field, #fbfbfa); transition: box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-search:focus-within { box-shadow: 0 0 0 1px var(--ink, #111111), 0 14px 30px -18px rgb(17 17 17 / 0.45); } .ds-search__input { flex: 1; min-width: 0; min-height: 3.5rem; padding: 0 1rem; border: 0; background: transparent; color: inherit; font: inherit; font-size: 1.0625rem; outline: none; caret-color: var(--klein, #002fa7); } .ds-search__input::placeholder { color: var(--graphite, #686865); } .ds-search__btn { min-height: 3.5rem; padding: 0 1.35rem; border: 0; border-radius: 0; background: var(--ink, #111111); color: var(--wall, #f3f3f1); font: inherit; font-size: 0.9375rem; font-weight: 600; cursor: pointer; transition: background-color 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-search__btn:hover { background: var(--klein, #002fa7); } .ds-search__btn:focus-visible { outline: 2px solid var(--klein, #002fa7); outline-offset: 3px; } .ds-search__hint { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 0.8125rem; color: var(--graphite, #686865); } .ds-kbd { display: inline-grid; place-items: center; min-width: 1.5em; height: 1.5em; padding: 0 0.35em; border: 1px solid var(--rule-strong, rgb(17 17 17 / 0.3)); font: inherit; font-size: 0.8em; font-weight: 600; line-height: 1; color: var(--ink, #111111); } @media (hover: none) { .ds-search__hint { display: none; } }"
+    },
+    {
+      "name": "Masthead",
+      "kind": "nav",
+      "refersTo": "masthead",
+      "description": "Frosted plaster signage: the square brand mark, drawn-underline links, and a small ink Join button.",
+      "html": "<header class=\"ds-masthead\"><a class=\"ds-brand\" href=\"#\"><span class=\"ds-brand__mark\" aria-hidden=\"true\"></span>AniRate</a><nav class=\"ds-masthead__nav\" aria-label=\"Primary\"><a class=\"ds-link\" href=\"#\" aria-current=\"page\">Collection</a><a class=\"ds-link\" href=\"#\">Rankings</a><a class=\"ds-link\" href=\"#\">Sign in</a><a class=\"ds-join\" href=\"#\">Join</a></nav></header>",
+      "css": ".ds-masthead { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; height: 4.25rem; padding: 0 1.5rem; background: rgb(243 243 241 / 0.86); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--rule, rgb(17 17 17 / 0.12)); font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); color: var(--ink, #111111); } .ds-brand { display: inline-flex; align-items: center; gap: 0.7rem; font-size: 1.0625rem; font-weight: 650; letter-spacing: -0.01em; font-variation-settings: 'wdth' 112; color: inherit; text-decoration: none; } .ds-brand__mark { width: 0.95rem; height: 0.95rem; background: var(--ink, #111111); transition: transform 480ms cubic-bezier(0.16, 1, 0.3, 1), background-color 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-brand:hover .ds-brand__mark { transform: rotate(90deg); background: var(--klein, #002fa7); } .ds-masthead__nav { display: flex; align-items: center; gap: 1.5rem; font-size: 0.9375rem; } .ds-link { color: inherit; text-decoration: none; padding-bottom: 1px; background-image: linear-gradient(currentColor, currentColor); background-position: 0 100%; background-repeat: no-repeat; background-size: 0% 1px; transition: background-size 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-link:hover, .ds-link[aria-current='page'] { background-size: 100% 1px; } .ds-join { display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0 1rem; background: var(--ink, #111111); color: var(--wall, #f3f3f1); font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: background-color 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-join:hover { background: var(--klein, #002fa7); } .ds-masthead a:focus-visible { outline: 2px solid var(--klein, #002fa7); outline-offset: 3px; }"
+    },
+    {
+      "name": "Sort Tabs",
+      "kind": "chip",
+      "refersTo": "tab-active",
+      "description": "Filter links named by a signage control label; the current one is Klein with a full 2px underline.",
+      "html": "<div class=\"ds-controls\"><span class=\"ds-controls__name\" id=\"ds-sort\">Sort</span><nav class=\"ds-tabs\" aria-labelledby=\"ds-sort\"><a class=\"ds-tab\" href=\"#\">Title</a><a class=\"ds-tab\" href=\"#\" aria-current=\"page\">Top rated</a><a class=\"ds-tab\" href=\"#\">Most voted</a><a class=\"ds-tab\" href=\"#\">Newest</a></nav></div>",
+      "css": ".ds-controls { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.75rem 1.5rem; padding-block: 1.25rem; border-block: 1px solid var(--rule, rgb(17 17 17 / 0.12)); font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); } .ds-controls__name { font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); font-size: 0.6875rem; line-height: 1rem; font-weight: 640; letter-spacing: 0.08em; text-transform: uppercase; font-variation-settings: 'wdth' 125; } .ds-controls__name { min-width: 4.5rem; color: var(--graphite, #686865); } .ds-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; } .ds-tab { position: relative; padding-block: 0.25rem; font-size: 0.9375rem; color: var(--ink-2, #3b3b39); text-decoration: none; transition: color 140ms linear; } .ds-tab::after { content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; background: var(--klein, #002fa7); transform: scaleX(0); transform-origin: left center; transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-tab:hover { color: var(--ink, #111111); } .ds-tab:hover::after { transform: scaleX(0.35); } .ds-tab[aria-current='page'] { color: var(--klein, #002fa7); font-weight: 600; } .ds-tab[aria-current='page']::after { transform: scaleX(1); } .ds-tab:focus-visible { outline: 2px solid var(--klein, #002fa7); outline-offset: 3px; }"
+    },
+    {
+      "name": "Measure Pair",
+      "kind": "custom",
+      "refersTo": "measure-lead",
+      "description": "Sub and dub as tabular figures over ruled tracks scaled to five; the leader prints in Klein.",
+      "html": "<div class=\"ds-measure-pair\"><span class=\"ds-measure\" style=\"--v:0.76\"><span class=\"ds-measure__head\"><span class=\"ds-measure__name\">Sub</span><span class=\"ds-measure__value\">3.8</span></span><span class=\"ds-measure__track\" aria-hidden=\"true\"><span class=\"ds-measure__fill\"></span></span></span><span class=\"ds-measure ds-measure--lead\" style=\"--v:0.86\"><span class=\"ds-measure__head\"><span class=\"ds-measure__name\">Dub</span><span class=\"ds-measure__value\">4.3</span></span><span class=\"ds-measure__track\" aria-hidden=\"true\"><span class=\"ds-measure__fill\"></span></span></span><span class=\"ds-measure-verdict\">Dub leads by 0.5</span></div>",
+      "css": ".ds-measure-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 22rem; font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); color: var(--ink, #111111); } .ds-measure { --v: 0; display: grid; gap: 0.45rem; } .ds-measure__head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; } .ds-measure__name { font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); font-size: 0.6875rem; line-height: 1rem; font-weight: 640; letter-spacing: 0.08em; text-transform: uppercase; font-variation-settings: 'wdth' 125; } .ds-measure__value { font-size: 2rem; line-height: 1; font-weight: 560; letter-spacing: -0.02em; font-variant-numeric: tabular-nums lining-nums; font-feature-settings: 'tnum' 1, 'lnum' 1; } .ds-measure__track { position: relative; height: 2px; background: var(--rule, rgb(17 17 17 / 0.12)); overflow: hidden; } .ds-measure__fill { position: absolute; inset: 0; background: var(--ink, #111111); transform-origin: left center; transform: scaleX(var(--v)); animation: ds-measure-draw 900ms cubic-bezier(0.16, 1, 0.3, 1) both; } .ds-measure--lead .ds-measure__value, .ds-measure--lead .ds-measure__name { color: var(--klein, #002fa7); } .ds-measure--lead .ds-measure__fill { background: var(--klein, #002fa7); } .ds-measure-verdict { grid-column: 1 / -1; font-size: 0.9375rem; font-weight: 600; color: var(--klein, #002fa7); } @keyframes ds-measure-draw { from { transform: scaleX(0); } } @media (prefers-reduced-motion: reduce) { .ds-measure__fill { animation: none; } }"
+    },
+    {
+      "name": "Rating Tiles",
+      "kind": "custom",
+      "refersTo": "tile-pressed",
+      "description": "Five square toggle tiles per version; the chosen one fills with Klein rising from its floor.",
+      "html": "<div class=\"ds-rate\" role=\"group\" aria-labelledby=\"ds-rate-sub\"><span class=\"ds-rate__name\" id=\"ds-rate-sub\">Sub</span><div class=\"ds-rate__tiles\"><button class=\"ds-tile\" type=\"button\" aria-pressed=\"false\">1</button><button class=\"ds-tile\" type=\"button\" aria-pressed=\"false\">2</button><button class=\"ds-tile\" type=\"button\" aria-pressed=\"false\">3</button><button class=\"ds-tile\" type=\"button\" aria-pressed=\"true\">4</button><button class=\"ds-tile\" type=\"button\" aria-pressed=\"false\">5</button></div></div>",
+      "css": ".ds-rate { display: grid; gap: 0.75rem; font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); color: var(--ink, #111111); } .ds-rate__name { font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); font-size: 0.6875rem; line-height: 1rem; font-weight: 640; letter-spacing: 0.08em; text-transform: uppercase; font-variation-settings: 'wdth' 125; } .ds-rate__tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; max-width: 26rem; } .ds-tile { position: relative; display: grid; place-items: center; aspect-ratio: 1.25; border: 1px solid var(--rule-strong, rgb(17 17 17 / 0.3)); border-radius: 0; background: none; color: inherit; font: inherit; font-size: 1.125rem; font-weight: 560; font-variant-numeric: tabular-nums lining-nums; overflow: hidden; isolation: isolate; cursor: pointer; transition: border-color 140ms linear, color 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 140ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-tile::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--klein, #002fa7); transform: scaleY(0); transform-origin: bottom center; transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-tile:hover { border-color: var(--ink, #111111); } .ds-tile:active { transform: scale(0.96); } .ds-tile:focus-visible { outline: 2px solid var(--klein, #002fa7); outline-offset: 3px; } .ds-tile[aria-pressed='true'] { border-color: var(--klein, #002fa7); color: var(--on-klein, #ffffff); } .ds-tile[aria-pressed='true']::before { transform: scaleY(1); }"
+    },
+    {
+      "name": "Catalogue Entry",
+      "kind": "card",
+      "refersTo": "measure",
+      "description": "One ruled checklist row: a 2:3 thumbnail (here a no-cover plate), title and meta, sub and dub measures, and the verdict tag.",
+      "html": "<a class=\"ds-entry\" href=\"#\"><span class=\"ds-entry__thumb\" aria-hidden=\"true\"><span class=\"ds-entry__initial\">M</span></span><span class=\"ds-entry__main\"><span class=\"ds-entry__title\">Mushishi <span class=\"ds-entry__tag\">Sample</span></span><span class=\"ds-entry__meta\">2005 · Finished · Adventure, Mystery</span></span><span class=\"ds-entry__measure ds-entry__measure--lead\" style=\"--v:0.9\"><span class=\"ds-entry__value\">4.5<span class=\"ds-entry__track\"><span class=\"ds-entry__fill\"></span></span></span></span><span class=\"ds-entry__measure ds-entry__measure--empty\"><span class=\"ds-entry__none\">Not listed</span></span><span class=\"ds-entry__verdict\">Sub only</span></a>",
+      "css": ".ds-entry { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr) 7rem 7rem 6rem; align-items: center; gap: 1.5rem; padding: 0.75rem; border-block: 1px solid var(--rule, rgb(17 17 17 / 0.12)); font-family: var(--font, Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif); color: var(--ink, #111111); text-decoration: none; transition: background-color 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-entry:hover { background: var(--wall-2, #e9e9e6); } .ds-entry:focus-visible { outline: 2px solid var(--klein, #002fa7); outline-offset: 3px; } .ds-entry__thumb { display: grid; place-items: center; aspect-ratio: 2 / 3; background: var(--wall-2, #e9e9e6); transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-entry:hover .ds-entry__thumb { transform: translateY(-2px); box-shadow: 0 1px 1px rgb(17 17 17 / 0.08), 0 10px 22px -10px rgb(17 17 17 / 0.4); } .ds-entry__initial { font-size: 1.5rem; line-height: 1; font-weight: 500; font-variation-settings: 'wdth' 125; color: var(--ink-2, #3b3b39); } .ds-entry__main { display: grid; gap: 0.3rem; min-width: 0; } .ds-entry__title { font-size: 1.0625rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.012em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-entry__tag { display: inline-block; margin-left: 0.6rem; padding: 0.1rem 0.35rem; border: 1px solid var(--rule-strong, rgb(17 17 17 / 0.3)); font-size: 0.5625rem; line-height: 0.9rem; font-weight: 640; letter-spacing: 0.08em; text-transform: uppercase; font-variation-settings: 'wdth' 125; color: var(--graphite, #686865); vertical-align: 0.2em; } .ds-entry__meta { font-size: 0.8125rem; color: var(--graphite, #686865); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-entry__measure { --v: 0; display: grid; } .ds-entry__value { display: grid; gap: 0.45rem; font-size: 1.125rem; line-height: 1; font-weight: 560; letter-spacing: -0.02em; font-variant-numeric: tabular-nums lining-nums; } .ds-entry__track { position: relative; height: 2px; background: var(--rule, rgb(17 17 17 / 0.12)); overflow: hidden; } .ds-entry__fill { position: absolute; inset: 0; background: var(--ink, #111111); transform-origin: left center; transform: scaleX(var(--v)); } .ds-entry__measure--lead .ds-entry__value { color: var(--klein, #002fa7); } .ds-entry__measure--lead .ds-entry__fill { background: var(--klein, #002fa7); } .ds-entry__none { font-size: 0.9375rem; line-height: 1.4; font-weight: 500; color: var(--graphite, #686865); } .ds-entry__verdict { font-size: 0.875rem; font-weight: 500; color: var(--graphite, #686865); white-space: nowrap; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Collection",
+    "overview": "AniRate is a white-cube gallery. Every anime hangs as a catalogued work, and its sub and dub are two measured states printed on the work's wall label. The ground is plaster, the type is gallery-black ink, and a single ink of International Klein Blue marks the one thing the visitor came to learn: which version leads, and which choice is active. Everything else stays quiet so that one blue mark is legible across a room.\n\nThe system borrows the wall label and the catalogue raisonné. Archivo is set as wall-label lettering, with its width axis doing the work of a second face. Corners are square, divisions are hairline rules, and every score is a tabular figure over a ruled track scaled to five. The catalogue is a ruled checklist on plaster, not a poster grid: covers are small objects in a list, and only the featured work on the home page and the work on its own page are hung large, with a soft gallery shadow. The density is calm and editorial, generous at the head of each page and tight in the checklist.\n\nMotion is a curator's hand, not a show. Each page gets one authored entrance (the hang on the home hero, the split drawing in on the work page), and cross-document view transitions carry a catalogue thumbnail into the hung work, in pure CSS so the zero-JavaScript catalogue gets it too. The whole system is light-only (`color-scheme: light`); the only dark grounds are gallery-black walls.",
+    "keyCharacteristics": [
+      "Plaster ground, gallery-black ink, one ink of Klein blue reserved for the leading version and the active choice.",
+      "One family, Archivo, with the width axis set to 125 for signage, 112 for display, 100 for reading.",
+      "Square corners, hairline rules, 2:3 work frames, tabular measures on ruled tracks.",
+      "One 12-column grid; the featured work hangs in the right six columns beside its wall label.",
+      "Missing data is labelled in graphite words, never filled.",
+      "Keyboard-first: skip links, a \"/\" shortcut to search, a visible Klein focus ring.",
+      "One authored entrance per page, view-transition morphs between list and work, and a complete reduced-motion path."
+    ],
+    "rules": [
+      {
+        "name": "The Two-Ink Rule",
+        "body": "The page is printed in ink on plaster; Klein is a second ink that appears only where a version leads, where a choice is active or confirmed, on focus and link actions, and as the hover of a call to action. If a blue mark does not answer \"which leads\" or \"what is chosen\", it is ink.",
+        "section": "colors"
+      },
+      {
+        "name": "The Black Wall Rule",
+        "body": "Large dark fields are gallery black, never Klein. The colophon and the auth wall are ink with plaster type; on them the selection inverts to plaster and the focus ring turns plaster, so Klein never lands on black.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Archivo is the only face. A new role gets a weight and a width setting, never a second family: 125 for signage and no-cover plates, 112 for display, headline, and the brand, 100 for reading.",
+        "section": "typography"
+      },
+      {
+        "name": "The Wall Label Rule",
+        "body": "Signage names a field, a measure, a column, or a control. It is never set as an eyebrow or kicker over a heading.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figure Rule",
+        "body": "Every number that is a measurement or a count (scores, gaps, rating counts, page numbers, years, distribution counts, tile numerals) is set with tabular lining figures so columns of scores align on the rule.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Grid Rule",
+        "body": "Every page composition places on the same 12 columns; a layout that needs a different page grid is a different system.",
+        "section": "layout"
+      },
+      {
+        "name": "The Lit Object Rule",
+        "body": "Shadows fall only from works on the wall. Buttons, fields, sections, and panels stay flat; the search field's focus lift is the single exception.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Square Corner Rule",
+        "body": "Radius is zero everywhere. A rounded corner reads as an app, not a gallery.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do keep Klein (#002fa7) to the leading measure, the active tab or tile, confirmations, focus, Klein links, and call-to-action hover; a screen should read as ink on plaster with a few blue marks.",
+      "Do set every score as a Measure: signage name, tabular figure, and a 2px ruled track scaled to five, with the leader in Klein and both versions always shown side by side.",
+      "Do label missing data in graphite words (\"No ratings yet\", \"Not listed\", \"Dub not reported\", \"No cover on record\", \"Sample record\") and hide the empty track.",
+      "Do print a provenance line on every wall label, and tag the demo titles as Sample.",
+      "Do place page compositions on the 12-column grid with the clamp margin and gutter, and divide content with 1px hairlines.",
+      "Do keep every interaction reachable by keyboard: a skip link first on each page, \"/\" to focus search (Escape to leave), the 2px Klein focus ring at a 3px offset, links with `aria-current` for filters, and toggle buttons with `aria-pressed` for tiles.",
+      "Do give each page one authored entrance, use the shared `work-<id>` view-transition name for any new surface that shows a work, and keep the entrance working in pure CSS.",
+      "Do provide the reduced-motion path for anything that moves: view transitions off, animations cut to an instant end state, scroll arrival off, hover lifts and press scales removed, while colour and fill changes still confirm actions."
+    ],
+    "donts": [
+      "Don't paint a large field, panel, or banner in Klein; dark grounds are gallery black (#111111).",
+      "Don't lay the collection out as a dark streaming poster grid; it is a ruled checklist on plaster, with covers as small objects.",
+      "Don't publish one blended score, or imply dub data the record does not report.",
+      "Don't fill an absence with zeros, a row of dashes, stock art, or a broken image.",
+      "Don't round a corner.",
+      "Don't add a second typeface; reach for Archivo's weight and width axis instead.",
+      "Don't set signage as an eyebrow or kicker over a heading.",
+      "Don't put shadows on buttons, fields, sections, or panels; shadows belong to works on the wall, and the search field's focus lift is the only exception.",
+      "Don't set scores, counts, or page numbers in proportional figures.",
+      "Don't add a second authored entrance to a page that already has one."
+    ]
+  }
+}

@@ -1,11 +1,12 @@
 // The admin module depends on comments so moderators can reuse comment deletion behavior.
 import { Module } from '@nestjs/common';
 import { CommentsModule } from '../comments/comments.module';
+import { DubReportsModule } from '../dub-reports/dub-reports.module';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
 @Module({
-  imports: [CommentsModule],
+  imports: [CommentsModule, DubReportsModule],
   controllers: [AdminController],
   providers: [AdminService],
 })

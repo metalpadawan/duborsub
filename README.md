@@ -1,6 +1,6 @@
 # duborsub
 
-This repository is organized around one runnable AniRate application, three incremental feature packs, a canonical database schema, and preserved source exports.
+This repository is organized around one runnable AniRate application, three incremental feature packs, and preserved source exports.
 
 ## Repository Layout
 
@@ -13,11 +13,12 @@ This repository is organized around one runnable AniRate application, three incr
 |   |-- v3-profiles-watchlist-ops/
 |   `-- v4-growth-social-search/
 |-- database/
-|   `-- schema.sql
+|   `-- init/              (creates the test database in local PostgreSQL)
 |-- docs/
 |   |-- git-workflow.md
 |   |-- prototypes/
 |   `-- repo-map.md
+|-- docker-compose.yml     (local PostgreSQL)
 `-- CONTRIBUTING.md
 ```
 
@@ -32,6 +33,8 @@ The `feature-packs/` directories are preserved add-on snapshots, not standalone 
 
 ## Run The App
 
+AniRate stores everything in PostgreSQL. Locally it runs in Docker, so install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/) first.
+
 Install root tooling if this is a fresh clone:
 
 ```powershell
@@ -44,11 +47,15 @@ Install app dependencies if needed:
 npm run setup
 ```
 
-Start both apps from the repo root:
+Copy `apps/anirate-base/backend/.env.example` to `.env` in the same folder; its database settings already match the local Docker database.
+
+Start everything from the repo root. This starts PostgreSQL (`npm run db:up`), applies any new migrations, then runs the backend and frontend:
 
 ```powershell
 npm run dev
 ```
+
+A new database starts with demo accounts and six sample titles. To load every anime (about 38,000 titles), see [docs/anime-data-import.md](docs/anime-data-import.md). `npm run db:down` stops the database; its data stays in a Docker volume.
 
 If old dev servers are still hanging onto ports, do a clean restart:
 
@@ -68,7 +75,7 @@ Build both apps from the repo root:
 npm run build
 ```
 
-Run the quality checks from the repo root:
+Run the quality checks from the repo root (the backend tests need the database running, and wipe the separate `anime_platform_test` database):
 
 ```powershell
 npm run lint
@@ -96,6 +103,6 @@ Important rule: edit maintained source files under `apps/anirate-base/backend/sr
 
 ## Notes
 
-- The local base app now persists its demo data to `apps/anirate-base/backend/.data/anirate-db.json` so changes survive restarts.
-- The canonical SQL schema is `database/schema.sql`.
+- Data lives in PostgreSQL. The schema is `apps/anirate-base/backend/prisma/schema.prisma`, and the SQL migrations beside it in `prisma/migrations/` are the canonical database definition.
+- To load or refresh the full anime catalogue, see [docs/anime-data-import.md](docs/anime-data-import.md).
 - Generated build output like `.next/` and `dist/` can be regenerated locally and is intentionally not part of the maintained source tree.

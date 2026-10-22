@@ -1,72 +1,94 @@
 // AdminService provides moderation actions plus simple aggregate views for dashboard pages.
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { CommentsService } from '../comments/comments.service';
-import { DataService } from '../data/data.service';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { DubReportsService } from '../dub-reports/dub-reports.service';
 import { MonitoringService } from '../monitoring/monitoring.service';
 import { AdminQueryDto, BanUserDto } from './dto/admin.dto';
 
 @Injectable()
 export class AdminService {
   constructor(
-    private readonly data: DataService,
+    private readonly prisma: PrismaService,
     private readonly commentsService: CommentsService,
     private readonly monitoring: MonitoringService,
+    private readonly dubReports: DubReportsService,
   ) {}
 
-  getDashboardStats() {
+  async getDashboardStats() {
     // The dashboard stays intentionally simple: totals, a small top list, and recent admin events.
+    const [totalUsers, totalAnime, totalRatings, totalComments, dubGroups, topRatedAnime, recentActivity] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.anime.count(),
+      this.prisma.rating.count(),
+      this.prisma.comment.count({ where: { isDeleted: false } }),
+      this.prisma.dubReport.groupBy({ by: ['animeId'] }),
+      // Highest better-version average among rated titles; votes break ties.
+      this.prisma.anime.findMany({
+        where: { totalVotes: { gt: 0 } },
+        orderBy: [{ bestRating: { sort: 'desc', nulls: 'last' } }, { totalVotes: 'desc' }],
+        take: 5,
+        select: { id: true, title: true },
+      }),
+      this.prisma.adminLog.findMany({ orderBy: { createdAt: 'desc' }, take: 20 }),
+    ]);
+
     return {
-      counts: {
-        totalUsers: this.data.users.length,
-        totalAnime: this.data.anime.length,
-        totalRatings: this.data.ratings.length,
-        totalComments: this.data.comments.filter((comment) => !comment.isDeleted).length,
-      },
-      topRatedAnime: this.data.anime.slice(0, 5).map((anime) => ({
-        id: anime.id,
-        title: anime.title,
-      })),
-      recentActivity: this.data.adminLogs.slice(-20).reverse(),
+      counts: { totalUsers, totalAnime, totalRatings, totalComments, pendingDubReports: dubGroups.length },
+      topRatedAnime,
+      recentActivity,
     };
   }
 
-  listUsers(query: AdminQueryDto) {
+  listDubReports() {
+    return this.dubReports.listPending();
+  }
+
+  async confirmDub(adminId: string, animeId: string, ipAddress: string) {
+    await this.dubReports.markDubbed(animeId);
+    await this.pushLog(adminId, 'CONFIRM_DUB', 'anime', animeId, ipAddress, null);
+    return { message: 'Dub confirmed' };
+  }
+
+  async dismissDubReports(adminId: string, animeId: string, ipAddress: string) {
+    await this.dubReports.dismiss(animeId);
+    await this.pushLog(adminId, 'DISMISS_DUB_REPORTS', 'anime', animeId, ipAddress, null);
+    return { message: 'Dub reports dismissed' };
+  }
+
+  async listUsers(query: AdminQueryDto) {
     const { search, page = 1, limit = 20 } = query;
-    let users = [...this.data.users];
+    const where: Prisma.UserWhereInput = search
+      ? {
+          OR: [
+            { username: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+          ],
+        }
+      : {};
 
-    if (search) {
-      const needle = search.toLowerCase();
-      users = users.filter(
-        (user) =>
-          user.username.toLowerCase().includes(needle) ||
-          user.email.toLowerCase().includes(needle),
-      );
-    }
+    const [total, users] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        select: { id: true, username: true, email: true, role: true, isBanned: true, createdAt: true },
+      }),
+    ]);
 
-    const total = users.length;
-    const start = (page - 1) * limit;
     return {
-      items: users.slice(start, start + limit).map((user) => ({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        isBanned: user.isBanned,
-        createdAt: user.createdAt,
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.max(1, Math.ceil(total / limit)),
-      },
+      items: users,
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
     };
   }
 
-  banUser(adminId: string, userId: string, dto: BanUserDto, ipAddress: string) {
+  async banUser(adminId: string, userId: string, dto: BanUserDto, ipAddress: string) {
     // Moderation actions always write an audit log entry so the admin UI has activity history.
-    const user = this.data.findUserById(userId);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -75,121 +97,103 @@ export class AdminService {
       throw new ForbiddenException('Admin accounts require a higher-privilege moderation workflow');
     }
 
-    user.isBanned = true;
-    user.banReason = dto.reason ?? null;
-    user.bannedUntil = dto.durationDays
-      ? new Date(Date.now() + dto.durationDays * 24 * 60 * 60 * 1000)
-      : null;
-    user.updatedAt = new Date();
-
-    this.pushLog(adminId, 'BAN_USER', 'user', user.id, ipAddress, {
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          isBanned: true,
+          banReason: dto.reason ?? null,
+          bannedUntil: dto.durationDays ? new Date(Date.now() + dto.durationDays * 24 * 60 * 60 * 1000) : null,
+        },
+      }),
+      this.prisma.refreshToken.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+    ]);
+    await this.pushLog(adminId, 'BAN_USER', 'user', user.id, ipAddress, {
       reason: dto.reason ?? null,
       durationDays: dto.durationDays ?? null,
     });
-    this.data.refreshTokens
-      .filter((token) => token.userId === user.id && !token.revokedAt)
-      .forEach((token) => {
-        token.revokedAt = new Date();
-      });
-    this.data.save();
     this.monitoring.recordSecurityEvent({
       type: 'admin.user_banned',
       severity: 'warning',
       message: 'An administrator banned a user and revoked active sessions',
       userId: user.id,
       ipAddress: ipAddress || null,
-      metadata: {
-        adminId,
-      },
+      metadata: { adminId },
     });
 
     return { message: 'User banned' };
   }
 
-  unbanUser(adminId: string, userId: string, ipAddress: string) {
-    const user = this.data.findUserById(userId);
-    if (!user) {
+  async unbanUser(adminId: string, userId: string, ipAddress: string) {
+    const { count } = await this.prisma.user.updateMany({
+      where: { id: userId },
+      data: { isBanned: false, banReason: null, bannedUntil: null },
+    });
+    if (count === 0) {
       throw new NotFoundException('User not found');
     }
 
-    user.isBanned = false;
-    user.banReason = null;
-    user.bannedUntil = null;
-    user.updatedAt = new Date();
-
-    this.pushLog(adminId, 'UNBAN_USER', 'user', user.id, ipAddress, null);
-    this.data.save();
+    await this.pushLog(adminId, 'UNBAN_USER', 'user', userId, ipAddress, null);
     this.monitoring.recordSecurityEvent({
       type: 'admin.user_unbanned',
       severity: 'info',
       message: 'An administrator restored a user account',
-      userId: user.id,
+      userId,
       ipAddress: ipAddress || null,
-      metadata: {
-        adminId,
-      },
+      metadata: { adminId },
     });
     return { message: 'User unbanned' };
   }
 
-  deleteComment(adminId: string, commentId: string, ipAddress: string) {
-    this.commentsService.softDeleteByAdmin(commentId);
-    this.pushLog(adminId, 'DELETE_COMMENT', 'comment', commentId, ipAddress, null);
-    this.data.save();
+  async deleteComment(adminId: string, commentId: string, ipAddress: string) {
+    await this.commentsService.softDeleteByAdmin(commentId);
+    await this.pushLog(adminId, 'DELETE_COMMENT', 'comment', commentId, ipAddress, null);
     this.monitoring.recordSecurityEvent({
       type: 'admin.comment_deleted',
       severity: 'info',
       message: 'An administrator removed a comment',
       ipAddress: ipAddress || null,
-      metadata: {
-        adminId,
-        commentId,
-      },
+      metadata: { adminId, commentId },
     });
     return { message: 'Comment removed' };
   }
 
-  getAdminLogs(query: AdminQueryDto) {
+  async getAdminLogs(query: AdminQueryDto) {
     const { page = 1, limit = 20 } = query;
-    const total = this.data.adminLogs.length;
-    const ordered = [...this.data.adminLogs].sort(
-      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
-    );
-    const start = (page - 1) * limit;
+    const [total, logs] = await Promise.all([
+      this.prisma.adminLog.count(),
+      this.prisma.adminLog.findMany({
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { admin: { select: { username: true } } },
+      }),
+    ]);
 
     return {
-      items: ordered.slice(start, start + limit).map((log) => ({
-        ...log,
-        admin: this.data.findUserById(log.adminId)
-          ? { username: this.data.findUserById(log.adminId)?.username }
-          : null,
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.max(1, Math.ceil(total / limit)),
-      },
+      items: logs,
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
     };
   }
 
-  private pushLog(
+  private async pushLog(
     adminId: string,
     action: string,
     targetType: string | null,
     targetId: string | null,
     ipAddress: string,
-    metadata: Record<string, unknown> | null,
+    metadata: Prisma.InputJsonObject | null,
   ) {
-    this.data.adminLogs.push({
-      id: randomUUID(),
-      adminId,
-      action,
-      targetType,
-      targetId,
-      metadata,
-      ipAddress: ipAddress || null,
-      createdAt: new Date(),
+    await this.prisma.adminLog.create({
+      data: {
+        id: randomUUID(),
+        adminId,
+        action,
+        targetType,
+        targetId,
+        metadata: metadata ?? Prisma.JsonNull,
+        ipAddress: ipAddress || null,
+      },
     });
   }
 }

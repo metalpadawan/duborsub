@@ -6,6 +6,7 @@ import { ParseResourceIdPipe } from './pipes/parse-resource-id.pipe';
 
 const BASE_ENV = {
   JWT_SECRET: 'x'.repeat(48),
+  DATABASE_URL: 'postgresql://user:pass@localhost:5432/anirate',
 };
 
 describe('ParseResourceIdPipe', () => {

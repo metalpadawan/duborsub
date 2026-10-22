@@ -1,54 +1,59 @@
 // CommentsService manages threaded discussion state, ownership checks, and vote totals.
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { DataService } from '../data/data.service';
-import {
-  CommentsQueryDto,
-  CreateCommentDto,
-  UpdateCommentDto,
-  VoteCommentDto,
-} from './dto/comments.dto';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { CommentsQueryDto, CreateCommentDto, UpdateCommentDto, VoteCommentDto } from './dto/comments.dto';
+
+const AUTHOR = { select: { id: true, username: true } } as const;
+
+const THREAD_SELECT = {
+  id: true,
+  content: true,
+  createdAt: true,
+  updatedAt: true,
+  user: AUTHOR,
+  replies: {
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, content: true, createdAt: true, updatedAt: true, user: AUTHOR },
+  },
+} satisfies Prisma.CommentSelect;
+
+type ThreadRow = Prisma.CommentGetPayload<{ select: typeof THREAD_SELECT }>;
 
 @Injectable()
 export class CommentsService {
-  constructor(private readonly data: DataService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  list(animeId: string, query: CommentsQueryDto) {
+  async list(animeId: string, query: CommentsQueryDto) {
     // We paginate top-level comments and always include their replies inline for convenience.
-    const anime = this.data.findAnimeById(animeId);
-    if (!anime) {
-      throw new NotFoundException('Anime not found');
-    }
+    await this.requireAnime(animeId);
 
     const { page = 1, limit = 20 } = query;
-    const allTopLevel = this.data.comments
-      .filter((comment) => comment.animeId === animeId && comment.parentId === null)
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
-
-    const total = allTopLevel.length;
-    const start = (page - 1) * limit;
-    const items = allTopLevel.slice(start, start + limit).map((comment) => this.serializeComment(comment.id));
+    const where = { animeId, parentId: null };
+    const [total, threads] = await Promise.all([
+      this.prisma.comment.count({ where }),
+      this.prisma.comment.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        select: THREAD_SELECT,
+      }),
+    ]);
 
     return {
-      items,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.max(1, Math.ceil(total / limit)),
-      },
+      items: await this.withScores(threads),
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
     };
   }
 
-  create(userId: string, animeId: string, dto: CreateCommentDto) {
+  async create(userId: string, animeId: string, dto: CreateCommentDto) {
     // Replies are just comments with parentId set, which keeps the model lightweight.
-    const anime = this.data.findAnimeById(animeId);
-    if (!anime) {
-      throw new NotFoundException('Anime not found');
-    }
+    await this.requireAnime(animeId);
 
     if (dto.parentId) {
-      const parent = this.findComment(dto.parentId, animeId);
+      const parent = await this.findComment(dto.parentId, animeId);
       if (parent.isDeleted) {
         throw new BadRequestException('You cannot reply to a deleted comment');
       }
@@ -60,24 +65,15 @@ export class CommentsService {
       }
     }
 
-    const created = {
-      id: randomUUID(),
-      userId,
-      animeId,
-      parentId: dto.parentId ?? null,
-      content: dto.content.trim(),
-      isDeleted: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    this.data.comments.push(created);
-    this.data.save();
+    const created = await this.prisma.comment.create({
+      data: { id: randomUUID(), userId, animeId, parentId: dto.parentId ?? null, content: dto.content.trim() },
+      select: { id: true },
+    });
     return this.serializeComment(created.id);
   }
 
-  update(userId: string, animeId: string, commentId: string, dto: UpdateCommentDto) {
-    const comment = this.findComment(commentId, animeId);
+  async update(userId: string, animeId: string, commentId: string, dto: UpdateCommentDto) {
+    const comment = await this.findComment(commentId, animeId);
     if (comment.userId !== userId) {
       throw new ForbiddenException('You can only edit your own comments');
     }
@@ -86,107 +82,73 @@ export class CommentsService {
       throw new BadRequestException('Deleted comments cannot be edited');
     }
 
-    comment.content = dto.content;
-    comment.updatedAt = new Date();
-    this.data.save();
-    return this.serializeComment(comment.id);
+    await this.prisma.comment.update({ where: { id: commentId }, data: { content: dto.content } });
+    return this.serializeComment(commentId);
   }
 
-  remove(userId: string, animeId: string, commentId: string) {
-    const comment = this.findComment(commentId, animeId);
+  async remove(userId: string, animeId: string, commentId: string) {
+    const comment = await this.findComment(commentId, animeId);
     if (comment.userId !== userId) {
       throw new ForbiddenException('You can only delete your own comments');
     }
 
-    comment.isDeleted = true;
-    comment.content = '[deleted]';
-    comment.updatedAt = new Date();
-    this.data.save();
+    await this.prisma.comment.update({ where: { id: commentId }, data: { isDeleted: true, content: '[deleted]' } });
     return { message: 'Comment deleted' };
   }
 
-  vote(userId: string, animeId: string, commentId: string, dto: VoteCommentDto) {
+  async vote(userId: string, animeId: string, commentId: string, dto: VoteCommentDto) {
     // Voting is an upsert so repeated likes/dislikes simply overwrite the prior choice.
-    const comment = this.findComment(commentId, animeId);
+    const comment = await this.findComment(commentId, animeId);
     if (comment.isDeleted) {
       throw new BadRequestException('Deleted comments cannot receive votes');
     }
 
-    const existing = this.data.commentLikes.find(
-      (like) => like.commentId === commentId && like.userId === userId,
-    );
-
-    if (existing) {
-      existing.value = dto.value;
-      this.data.save();
-      return { message: 'Vote updated' };
-    }
-
-    this.data.commentLikes.push({
-      commentId,
-      userId,
-      value: dto.value,
-      createdAt: new Date(),
+    const existing = await this.prisma.commentLike.findUnique({ where: { commentId_userId: { commentId, userId } } });
+    await this.prisma.commentLike.upsert({
+      where: { commentId_userId: { commentId, userId } },
+      create: { commentId, userId, value: dto.value },
+      update: { value: dto.value },
     });
-    this.data.save();
-    return { message: 'Vote recorded' };
+    return { message: existing ? 'Vote updated' : 'Vote recorded' };
   }
 
-  removeVote(userId: string, animeId: string, commentId: string) {
-    this.findComment(commentId, animeId);
-    const index = this.data.commentLikes.findIndex(
-      (like) => like.commentId === commentId && like.userId === userId,
-    );
-    if (index >= 0) {
-      this.data.commentLikes.splice(index, 1);
-      this.data.save();
-    }
+  async removeVote(userId: string, animeId: string, commentId: string) {
+    await this.findComment(commentId, animeId);
+    await this.prisma.commentLike.deleteMany({ where: { commentId, userId } });
     return { message: 'Vote removed' };
   }
 
-  softDeleteByAdmin(commentId: string) {
-    const comment = this.findComment(commentId);
-    comment.isDeleted = true;
-    comment.content = '[removed by moderator]';
-    comment.updatedAt = new Date();
-    this.data.save();
+  async softDeleteByAdmin(commentId: string) {
+    await this.findComment(commentId);
+    await this.prisma.comment.update({ where: { id: commentId }, data: { isDeleted: true, content: '[removed by moderator]' } });
   }
 
-  private serializeComment(commentId: string) {
-    // Serialization gathers the user, replies, and score so the frontend needs one request only.
-    const comment = this.findComment(commentId);
-    const user = this.data.findUserById(comment.userId);
-    const replies = this.data.comments
-      .filter((entry) => entry.parentId === comment.id)
-      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
-      .map((reply) => {
-        const replyUser = this.data.findUserById(reply.userId);
-        return {
-          id: reply.id,
-          content: reply.content,
-          createdAt: reply.createdAt,
-          updatedAt: reply.updatedAt,
-          user: replyUser ? { id: replyUser.id, username: replyUser.username } : null,
-        };
-      });
-
-    const likeScore = this.data.commentLikes
-      .filter((like) => like.commentId === comment.id)
-      .reduce((total, like) => total + like.value, 0);
-
-    return {
-      id: comment.id,
-      content: comment.content,
-      createdAt: comment.createdAt,
-      updatedAt: comment.updatedAt,
-      user: user ? { id: user.id, username: user.username } : null,
-      replies,
-      _count: { likes: likeScore },
-    };
+  private async serializeComment(commentId: string) {
+    const thread = await this.prisma.comment.findUniqueOrThrow({ where: { id: commentId }, select: THREAD_SELECT });
+    return (await this.withScores([thread]))[0];
   }
 
-  private findComment(commentId: string, animeId?: string) {
-    const comment = this.data.comments.find((entry) => entry.id === commentId) ?? null;
+  // The like score is the sum of +1 and -1 votes, summed in one query per page.
+  private async withScores(threads: ThreadRow[]) {
+    const sums = await this.prisma.commentLike.groupBy({
+      by: ['commentId'],
+      where: { commentId: { in: threads.map((thread) => thread.id) } },
+      _sum: { value: true },
+    });
+    const scores = new Map(sums.map((entry) => [entry.commentId, entry._sum.value ?? 0]));
+
+    return threads.map((thread) => ({ ...thread, _count: { likes: scores.get(thread.id) ?? 0 } }));
+  }
+
+  private async requireAnime(animeId: string) {
+    const anime = await this.prisma.anime.findUnique({ where: { id: animeId }, select: { id: true } });
+    if (!anime) {
+      throw new NotFoundException('Anime not found');
+    }
+  }
+
+  private async findComment(commentId: string, animeId?: string) {
+    const comment = await this.prisma.comment.findUnique({ where: { id: commentId } });
     if (!comment || (animeId && comment.animeId !== animeId)) {
       throw new NotFoundException('Comment not found');
     }

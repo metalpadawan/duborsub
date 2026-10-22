@@ -1,5 +1,5 @@
 // The anime DTOs define the catalog payloads and query parameters used by the UI.
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayUnique,
@@ -40,7 +40,7 @@ export class CreateAnimeDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1960)
+  @Min(1900)
   @Max(2100)
   releaseYear?: number;
 
@@ -84,7 +84,7 @@ export class UpdateAnimeDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1960)
+  @Min(1900)
   @Max(2100)
   releaseYear?: number;
 
@@ -127,8 +127,15 @@ export class AnimeQueryDto {
   genreId?: number;
 
   @IsOptional()
-  @IsIn(['title', 'rating', 'year', 'votes'])
-  sortBy?: 'title' | 'rating' | 'year' | 'votes';
+  @IsIn(['title', 'rating', 'year', 'votes', 'relevance', 'popular'])
+  sortBy?: 'title' | 'rating' | 'year' | 'votes' | 'relevance' | 'popular';
+
+  // Only titles with at least one rating, for the rankings.
+  @IsOptional()
+  // Read from the raw query: implicit conversion would turn the string 'false' into true.
+  @Transform(({ obj, key }) => obj[key] === true || obj[key] === 'true' || obj[key] === '1')
+  @IsBoolean()
+  rated?: boolean;
 
   @IsOptional()
   @IsIn(['asc', 'desc'])

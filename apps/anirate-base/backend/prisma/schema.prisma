@@ -1,0 +1,242 @@
+// AniRate's PostgreSQL schema. Migrations in ./migrations are the canonical SQL;
+// apply them with `npm run db:migrate` (development) or `npm run db:deploy`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+enum AnimeStatus {
+  airing
+  completed
+  upcoming
+}
+
+enum AnimeFormat {
+  TV
+  MOVIE
+  OVA
+  ONA
+  SPECIAL
+}
+
+model User {
+  // Text, not UUID: seeded accounts use readable ids such as "seed-user-demo".
+  id                  String    @id
+  username            String    @unique @db.VarChar(30)
+  // Stored lower-cased, so the unique index is case-insensitive in practice.
+  email               String    @unique @db.VarChar(254)
+  passwordHash        String    @map("password_hash")
+  role                UserRole  @default(user)
+  isBanned            Boolean   @default(false) @map("is_banned")
+  banReason           String?   @map("ban_reason")
+  bannedUntil         DateTime? @map("banned_until") @db.Timestamptz()
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz()
+  lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz()
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  ratings             Rating[]
+  comments            Comment[]
+  commentLikes        CommentLike[]
+  passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]
+  adminLogs           AdminLog[]
+  dubReports          DubReport[]
+
+  @@map("users")
+}
+
+model Anime {
+  // Imported titles carry their source site's id ("anilist-21", "mal-5114");
+  // titles created by an admin get a UUID.
+  id                String       @id @db.VarChar(64)
+  title             String       @db.VarChar(255)
+  // Folded title (lower case, no accents or punctuation) for A-Z order.
+  sortTitle         String       @map("sort_title")
+  // Folded title and alternative titles, searched through a trigram index.
+  searchText        String       @map("search_text")
+  description       String       @default("")
+  coverImageUrl     String?      @map("cover_image_url")
+  releaseYear       Int?         @map("release_year")
+  hasDub            Boolean      @default(false) @map("has_dub")
+  status            AnimeStatus  @default(completed)
+  format            AnimeFormat?
+  episodes          Int?
+  alternativeTitles String[]     @default([]) @map("alternative_titles")
+  externalIds       Json         @default("{}") @map("external_ids")
+  // Library user counts from Kitsu, for the "Popular" order.
+  popularity        Int?
+
+  // Rating totals, kept in step with the ratings table on every change so lists
+  // can sort by them in SQL.
+  subSum            Int          @default(0) @map("sub_sum")
+  subCount          Int          @default(0) @map("sub_count")
+  dubSum            Int          @default(0) @map("dub_sum")
+  dubCount          Int          @default(0) @map("dub_count")
+  totalVotes        Int          @default(0) @map("total_votes")
+  avgSubRating      Float?       @map("avg_sub_rating")
+  avgDubRating      Float?       @map("avg_dub_rating")
+  // The better of the two averages: what the rankings order by.
+  bestRating        Float?       @map("best_rating")
+
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
+
+  genres            AnimeGenre[]
+  ratings           Rating[]
+  comments          Comment[]
+  dubReports        DubReport[]
+
+  @@index([sortTitle])
+  @@index([popularity(sort: Desc)])
+  @@index([releaseYear])
+  @@index([bestRating(sort: Desc)])
+  @@index([totalVotes(sort: Desc)])
+  @@map("anime")
+}
+
+model Genre {
+  id    Int          @id @default(autoincrement())
+  name  String       @unique @db.VarChar(50)
+  anime AnimeGenre[]
+
+  @@map("genres")
+}
+
+model AnimeGenre {
+  animeId String @map("anime_id") @db.VarChar(64)
+  genreId Int    @map("genre_id")
+  anime   Anime  @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  genre   Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([animeId, genreId])
+  @@index([genreId])
+  @@map("anime_genres")
+}
+
+model Rating {
+  id        String   @id
+  userId    String   @map("user_id")
+  animeId   String   @map("anime_id") @db.VarChar(64)
+  subRating Int?     @map("sub_rating") @db.SmallInt
+  dubRating Int?     @map("dub_rating") @db.SmallInt
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime     Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@index([animeId])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("ratings")
+}
+
+model Comment {
+  id        String        @id
+  userId    String        @map("user_id")
+  animeId   String        @map("anime_id") @db.VarChar(64)
+  parentId  String?       @map("parent_id")
+  content   String
+  isDeleted Boolean       @default(false) @map("is_deleted")
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime     Anime         @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[]     @relation("CommentReplies")
+  likes     CommentLike[]
+
+  @@index([animeId, parentId, createdAt])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model CommentLike {
+  commentId String   @map("comment_id")
+  userId    String   @map("user_id")
+  // 1 = like, -1 = dislike
+  value     Int      @db.SmallInt
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@map("comment_likes")
+}
+
+model DubReport {
+  id        String   @id
+  animeId   String   @map("anime_id") @db.VarChar(64)
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  anime     Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([animeId, userId])
+  @@map("dub_reports")
+}
+
+model PasswordResetToken {
+  id        String    @id
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz()
+  usedAt    DateTime? @map("used_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model RefreshToken {
+  id                String    @id
+  userId            String    @map("user_id")
+  tokenHash         String    @unique @map("token_hash")
+  ipAddress         String?   @map("ip_address")
+  userAgent         String?   @map("user_agent")
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz()
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz()
+  // Set when the token was revoked by normal rotation, so a near-simultaneous
+  // second refresh can be told apart from a stolen token being replayed.
+  replacedByTokenId String?   @map("replaced_by_token_id")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model AdminLog {
+  id         String   @id
+  adminId    String   @map("admin_id")
+  action     String   @db.VarChar(64)
+  targetType String?  @map("target_type") @db.VarChar(32)
+  targetId   String?  @map("target_id") @db.VarChar(64)
+  metadata   Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  admin      User     @relation(fields: [adminId], references: [id])
+
+  @@index([createdAt(sort: Desc)])
+  @@map("admin_logs")
+}

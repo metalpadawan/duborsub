@@ -1,0 +1,25 @@
+# Local PostgreSQL for AniRate development: `npm run db:up` from the repo root.
+# The credentials are for this machine only; deployments supply their own DATABASE_URL.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: anirate-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: anirate
+      POSTGRES_PASSWORD: anirate_dev
+      POSTGRES_DB: anime_platform
+    ports:
+      - '5432:5432'
+    volumes:
+      - anirate-postgres:/var/lib/postgresql/data
+      # Creates the separate database the backend tests use.
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U anirate -d anime_platform']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  anirate-postgres:

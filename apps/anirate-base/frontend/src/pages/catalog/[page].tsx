@@ -1,8 +1,13 @@
 import type { GetStaticPaths, GetStaticProps } from 'next';
-import { parseCatalogPage, type HomeProps } from '@/lib/catalog-view';
+import { parseCatalogPage, type HomeProps, type ZeroJsPageConfig } from '@/lib/catalog-view';
 import HomePage from '../index';
 
 export default HomePage;
+
+// Same as the home page: server-rendered, no React runtime.
+export const config: ZeroJsPageConfig = {
+  unstable_runtimeJS: false,
+};
 
 export const getStaticPaths: GetStaticPaths = async () => {
   const { loadCatalogPageProps } = await import('@/lib/server/catalog-page-props');

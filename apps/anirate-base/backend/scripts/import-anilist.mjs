@@ -1,114 +1,58 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// Imports AniList's most popular titles, with synopses and English titles, into the
+// catalogue. It writes straight to PostgreSQL, so the backend can stay up.
+//
+//   node scripts/import-anilist.mjs [--pages 5] [--per-page 50]
+import { buildSearchText, connect, genreIdsByName, parseArgs, sortTitleOf } from './lib/db.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_FILE = process.env.DATA_FILE
-  ? resolve(process.env.DATA_FILE)
-  : resolve(__dirname, '..', '.data', 'anirate-db.json');
 const ANILIST_API = 'https://graphql.anilist.co';
+// AniList's TV_SHORT is folded into TV, matching the catalogue's formats.
+const CATALOG_FORMATS = { TV: 'TV', TV_SHORT: 'TV', MOVIE: 'MOVIE', OVA: 'OVA', ONA: 'ONA', SPECIAL: 'SPECIAL' };
 
 const args = parseArgs(process.argv.slice(2));
 const pages = clamp(Number(args.pages ?? 1), 1, 100);
 const perPage = clamp(Number(args['per-page'] ?? 50), 1, 50);
-const apiUrl = String(args['api-url'] ?? `http://localhost:${process.env.PORT ?? 4000}/api/v1`);
 
 // Failures set process.exitCode and return instead of calling process.exit(), which
 // can abort Node on Windows while a just-finished fetch is still closing its handles.
 process.exitCode = await main();
 
 async function main() {
-  if (!existsSync(DATA_FILE)) {
-    console.error(`Datastore not found at ${DATA_FILE}`);
-    console.error('Start the backend once first so it creates the local datastore, stop it, then rerun this import.');
-    return 1;
-  }
-
-  // The backend keeps the whole datastore in memory and rewrites the file on every
-  // change, so importing while it runs would be silently overwritten on its next save.
-  if (!args.force && (await isBackendRunning(apiUrl))) {
-    console.error(`The AniRate backend is running at ${apiUrl}.`);
-    console.error('Stop it before importing, otherwise its next save overwrites the imported anime.');
-    console.error('Pass --force to import anyway (for example if that URL belongs to another service).');
-    return 1;
-  }
-
-  await importAnime();
-  return 0;
-}
-
-async function importAnime() {
-  const snapshot = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
-  snapshot.genres ??= [];
-  snapshot.anime ??= [];
-  snapshot.ratings ??= [];
-  snapshot.comments ??= [];
-  snapshot.commentLikes ??= [];
-  snapshot.refreshTokens ??= [];
-  snapshot.passwordResetTokens ??= [];
-  snapshot.adminLogs ??= [];
-
+  const prisma = connect();
   let imported = 0;
   let updated = 0;
 
-  for (let page = 1; page <= pages; page += 1) {
-    const result = await fetchAniListPage(page, perPage);
+  try {
+    for (let page = 1; page <= pages; page += 1) {
+      const result = await fetchAniListPage(page, perPage);
+      const media = result.data.Page.media;
+      const genreIds = await genreIdsByName(prisma, [...new Set(media.flatMap((entry) => entry.genres ?? []))]);
 
-    for (const media of result.data.Page.media) {
-      const anime = toAnimeRecord(media, snapshot);
-      const existingIndex = snapshot.anime.findIndex((entry) => entry.id === anime.id);
+      for (const entry of media) {
+        const record = toAnimeRecord(entry);
+        const genres = (entry.genres ?? []).map((name) => ({ genreId: genreIds.get(name.toLowerCase()) }));
+        const existing = await prisma.anime.findUnique({ where: { id: record.id }, select: { id: true } });
 
-      if (existingIndex >= 0) {
-        snapshot.anime[existingIndex] = {
-          ...snapshot.anime[existingIndex],
-          ...anime,
-          updatedAt: new Date().toISOString(),
-        };
-        updated += 1;
-      } else {
-        snapshot.anime.push(anime);
-        imported += 1;
+        // The dub flag is set by viewers and admins, so a metadata refresh never touches it.
+        await prisma.anime.upsert({
+          where: { id: record.id },
+          create: { ...record, hasDub: false, genres: { create: genres } },
+          update: { ...record, genres: { deleteMany: {}, create: genres } },
+        });
+
+        if (existing) updated += 1;
+        else imported += 1;
       }
     }
+  } catch (error) {
+    console.error(`Stopped: ${error.message}`);
+    console.error(`Added ${imported} and updated ${updated} titles before stopping.`);
+    return 1;
+  } finally {
+    await prisma.$disconnect();
   }
 
-  // Write to a temp file and rename so an interrupted import cannot leave a
-  // half-written datastore behind.
-  const tempFile = `${DATA_FILE}.import-${process.pid}.tmp`;
-  writeFileSync(tempFile, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
-  renameSync(tempFile, DATA_FILE);
   console.log(`AniList import complete. Added ${imported}, updated ${updated}.`);
-}
-
-async function isBackendRunning(url) {
-  try {
-    const response = await fetch(`${url.replace(/\/$/, '')}/health`, {
-      signal: AbortSignal.timeout(1500),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
-function parseArgs(rawArgs) {
-  const parsed = {};
-
-  for (let index = 0; index < rawArgs.length; index += 1) {
-    const arg = rawArgs[index];
-    if (!arg.startsWith('--')) {
-      continue;
-    }
-
-    const [rawKey, inlineValue] = arg.slice(2).split('=');
-    parsed[rawKey] = inlineValue ?? rawArgs[index + 1] ?? true;
-
-    if (inlineValue === undefined && rawArgs[index + 1] && !rawArgs[index + 1].startsWith('--')) {
-      index += 1;
-    }
-  }
-
-  return parsed;
+  return 0;
 }
 
 function clamp(value, min, max) {
@@ -130,12 +74,18 @@ async function fetchAniListPage(page, perPage) {
       query: `
         query ImportAnime($page: Int!, $perPage: Int!) {
           Page(page: $page, perPage: $perPage) {
-            media(type: ANIME, sort: POPULARITY_DESC) {
+            media(type: ANIME, isAdult: false, sort: POPULARITY_DESC) {
               id
+              idMal
               title {
                 romaji
                 english
+                native
               }
+              synonyms
+              format
+              episodes
+              popularity
               description(asHtml: false)
               coverImage {
                 large
@@ -155,27 +105,34 @@ async function fetchAniListPage(page, perPage) {
   });
 
   if (!response.ok) {
-    throw new Error(`AniList request failed: ${response.status} ${response.statusText}`);
+    const reason = await response
+      .json()
+      .then((body) => body.errors?.map((error) => error.message).join('; '))
+      .catch(() => null);
+    throw new Error(`AniList request failed: ${response.status} ${reason || response.statusText}`);
   }
 
   return response.json();
 }
 
-function toAnimeRecord(media, snapshot) {
-  const now = new Date().toISOString();
+function toAnimeRecord(media) {
   const title = media.title?.english || media.title?.romaji || `AniList ${media.id}`;
+  const alternativeTitles = [media.title?.romaji, media.title?.english, media.title?.native, ...(media.synonyms ?? [])]
+    .filter((name, index, names) => name && name !== title && names.indexOf(name) === index);
 
   return {
     id: `anilist-${media.id}`,
     title,
+    sortTitle: sortTitleOf(title),
+    searchText: buildSearchText(title, alternativeTitles),
     description: normalizeDescription(media.description),
     coverImageUrl: media.coverImage?.extraLarge || media.coverImage?.large || null,
     releaseYear: media.startDate?.year ?? null,
-    hasDub: false,
     status: mapStatus(media.status),
-    genres: (media.genres ?? []).map((name) => getOrCreateGenre(snapshot, name)),
-    createdAt: now,
-    updatedAt: now,
+    alternativeTitles,
+    format: CATALOG_FORMATS[media.format] ?? null,
+    episodes: media.episodes ?? null,
+    externalIds: media.idMal ? { anilist: media.id, mal: media.idMal } : { anilist: media.id },
   };
 }
 
@@ -196,16 +153,4 @@ function mapStatus(status) {
   }
 
   return 'completed';
-}
-
-function getOrCreateGenre(snapshot, name) {
-  const existing = snapshot.genres.find((genre) => genre.name.toLowerCase() === name.toLowerCase());
-  if (existing) {
-    return existing;
-  }
-
-  const maxId = snapshot.genres.reduce((max, genre) => Math.max(max, Number(genre.id) || 0), 0);
-  const genre = { id: maxId + 1, name };
-  snapshot.genres.push(genre);
-  return genre;
 }

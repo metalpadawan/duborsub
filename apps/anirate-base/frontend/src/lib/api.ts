@@ -203,6 +203,28 @@ export const ratingsApi = {
   distribution: (animeId: string) => api.get(`/anime/${animeId}/ratings/distribution`),
 };
 
+export const dubApi = {
+  state: (animeId: string) => api.get<DubState>(`/anime/${animeId}/dub`),
+  mine: (animeId: string) => api.get<DubState>(`/anime/${animeId}/dub/me`),
+  report: (animeId: string) => api.post<DubState>(`/anime/${animeId}/dub/reports`),
+  withdraw: (animeId: string) => api.delete<DubState>(`/anime/${animeId}/dub/reports`),
+};
+
+export const myRatingsApi = {
+  list: (page = 1) => api.get<Paginated<MyRatingItem>>('/me/ratings', { params: { page, limit: 20 } }),
+};
+
+export const adminApi = {
+  dashboard: () => api.get<AdminDashboard>('/admin/dashboard'),
+  dubReports: () => api.get<{ items: DubReportItem[]; threshold: number }>('/admin/dub-reports'),
+  confirmDub: (animeId: string) => api.post(`/admin/dub-reports/${animeId}/confirm`),
+  dismissDub: (animeId: string) => api.post(`/admin/dub-reports/${animeId}/dismiss`),
+  users: (params: { search?: string; page?: number }) => api.get<Paginated<AdminUser>>('/admin/users', { params }),
+  ban: (userId: string, data: { reason?: string; durationDays?: number }) => api.post(`/admin/users/${userId}/ban`, data),
+  unban: (userId: string) => api.post(`/admin/users/${userId}/unban`),
+  logs: (page = 1) => api.get<Paginated<AdminLogItem>>('/admin/logs', { params: { page } }),
+};
+
 export const commentsApi = {
   list: (animeId: string, params?: { page?: number; limit?: number }) =>
     api.get<CommentListResponse>(`/anime/${animeId}/comments`, { params }),
@@ -252,10 +274,15 @@ export interface Anime {
   avgDubRating?: number | null;
   totalVotes: number;
   genres: Genre[];
+  description?: string | null;
+  format?: 'TV' | 'MOVIE' | 'OVA' | 'ONA' | 'SPECIAL' | null;
+  episodes?: number | null;
 }
 
 export interface AnimeDetail extends Anime {
-  description?: string;
+  alternativeTitles?: string[];
+  externalIds?: { anilist?: number; mal?: number; kitsu?: number; anidb?: number };
+  dubReports?: number;
 }
 
 export interface PaginatedAnime {
@@ -266,6 +293,61 @@ export interface PaginatedAnime {
     total: number;
     pages: number;
   };
+}
+
+export interface Paginated<T> {
+  items: T[];
+  pagination: PaginatedAnime['pagination'];
+}
+
+export interface DubState {
+  hasDub: boolean;
+  reports: number;
+  reportedByMe: boolean;
+  threshold: number;
+}
+
+export interface MyRatingItem {
+  subRating: number | null;
+  dubRating: number | null;
+  updatedAt: string;
+  anime: Pick<Anime, 'id' | 'title' | 'coverImageUrl' | 'releaseYear' | 'format' | 'hasDub'>;
+}
+
+export interface AdminDashboard {
+  counts: {
+    totalUsers: number;
+    totalAnime: number;
+    totalRatings: number;
+    totalComments: number;
+    pendingDubReports: number;
+  };
+  topRatedAnime: Array<{ id: string; title: string }>;
+  recentActivity: AdminLogItem[];
+}
+
+export interface DubReportItem {
+  anime: Pick<Anime, 'id' | 'title' | 'releaseYear' | 'format'>;
+  reports: number;
+  latestAt: string;
+}
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  email: string;
+  role: 'user' | 'admin';
+  isBanned: boolean;
+  createdAt: string;
+}
+
+export interface AdminLogItem {
+  id: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  createdAt: string;
+  admin?: { username?: string } | null;
 }
 
 export interface AnimeQuery {

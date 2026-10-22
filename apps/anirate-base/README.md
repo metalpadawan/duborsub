@@ -1,31 +1,31 @@
 # AniRate Base App
 
-This is the runnable base application for the repo. It contains the Nest backend, the Next frontend, and the reference Prisma schema for the original project.
+This is the runnable base application for the repo: the Nest backend, with its PostgreSQL schema and migrations, and the Next frontend.
 
 ## What Runs Today
 
 - `backend/` is the local Nest API
 - `frontend/` is the local Next.js app
-- the current development build persists local data to `backend/.data/anirate-db.json`, so it can boot without PostgreSQL
-- `../../database/schema.sql` remains the canonical SQL schema for future database wiring
+- data lives in PostgreSQL; locally it runs in Docker from the repo's `docker-compose.yml`
+- `backend/prisma/schema.prisma` and its `migrations/` are the canonical database definition
 
 ## Project Structure
 
 ```text
 apps/anirate-base/
 |-- backend/
+|   |-- prisma/          (schema.prisma and SQL migrations)
+|   |-- scripts/         (catalogue import and export)
 |   |-- src/
 |   `-- .env.example
-|-- frontend/
-|   |-- src/
-|   `-- .env.local.example
-`-- prisma/
-    `-- schema.prisma
+`-- frontend/
+    |-- src/
+    `-- .env.local.example
 ```
 
 ## Start The App
 
-From the repo root:
+Start Docker Desktop, copy `backend/.env.example` to `backend/.env`, then from the repo root:
 
 ```powershell
 npm run dev
@@ -64,6 +64,7 @@ Demo accounts:
 
 - Edit backend code in `backend/src`
 - Edit frontend code in `frontend/src`
+- Change the database through `backend/prisma/schema.prisma`, then `npm --prefix apps/anirate-base/backend run db:migrate -- --name <change>` to write the migration
 - Do not edit generated output like `frontend/.next` or backend `dist`
 
 ## Related Docs

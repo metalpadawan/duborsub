@@ -42,8 +42,8 @@ Each pack assumes the previous layer already exists.
 
 ## Database Assets
 
-- `database/schema.sql` is the canonical SQL schema to use.
-- `apps/anirate-base/prisma/schema.prisma` is the Prisma model source for the base app.
+- `apps/anirate-base/backend/prisma/schema.prisma` is the database model, and the SQL in `prisma/migrations/` is the canonical schema.
+- `docker-compose.yml` runs PostgreSQL locally; `database/init/` creates the separate test database on its first start.
 
 ## Cleanup Notes
 

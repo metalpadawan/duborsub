@@ -26,6 +26,12 @@ export class AnimeController {
     return this.animeService.findAll(query);
   }
 
+  // Declared before ':id' so "genres" is not read as an anime id.
+  @Get('genres')
+  genres() {
+    return this.animeService.listGenres();
+  }
+
   @Get(':id')
   getOne(@Param('id', ParseResourceIdPipe) id: string) {
     return this.animeService.findOne(id);

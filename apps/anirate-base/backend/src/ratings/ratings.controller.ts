@@ -6,12 +6,13 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ParseResourceIdPipe } from '../common/pipes/parse-resource-id.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { UpsertRatingDto } from './dto/ratings.dto';
+import { MyRatingsQueryDto, UpsertRatingDto } from './dto/ratings.dto';
 import { RatingsService } from './ratings.service';
 
 @Controller('anime/:animeId/ratings')
@@ -43,5 +44,17 @@ export class RatingsController {
   @Get('distribution')
   getDistribution(@Param('animeId', ParseResourceIdPipe) animeId: string) {
     return this.ratingsService.getDistribution(animeId);
+  }
+}
+
+// The signed-in viewer's own ratings across the whole catalogue.
+@Controller('me/ratings')
+@UseGuards(JwtAuthGuard)
+export class MyRatingsController {
+  constructor(private readonly ratingsService: RatingsService) {}
+
+  @Get()
+  list(@CurrentUser() user: { id: string }, @Query() query: MyRatingsQueryDto) {
+    return this.ratingsService.listMine(user.id, query);
   }
 }

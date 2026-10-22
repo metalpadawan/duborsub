@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { AuthLayout } from '@/components/AuthLayout';
+import { AuthLayout, PasswordInput, errorMessage } from '@/components/AuthLayout';
 import { useAuthStore } from '@/lib/auth.store';
 
 export default function LoginPage() {
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const login = useAuthStore((state) => state.login);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -25,32 +26,24 @@ export default function LoginPage() {
       await login(email, password);
       // We redirect after the store is populated so the header renders the signed-in state immediately.
       router.push('/');
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Invalid credentials');
+    } catch (err) {
+      setError(errorMessage(err, 'That email and password do not match an account.'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to rate and review anime">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <AuthLayout title="Sign in" subtitle="Welcome back. Your ratings and notes are where you left them.">
+      <form onSubmit={handleSubmit} className="form">
         {error ? (
-          <div
-            role="alert"
-            className="text-sm px-3 py-2 rounded-lg"
-            style={{
-              background: 'rgba(239,68,68,0.1)',
-              color: '#ef4444',
-              border: '1px solid rgba(239,68,68,0.2)',
-            }}
-          >
+          <div role="alert" className="notice notice--error">
             {error}
           </div>
         ) : null}
 
-        <div>
-          <label htmlFor="email" className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-3)' }}>
+        <div className="field">
+          <label htmlFor="email" className="field__label signage">
             Email
           </label>
           <input
@@ -59,39 +52,39 @@ export default function LoginPage() {
             className="input"
             required
             autoComplete="email"
+            aria-invalid={error ? true : undefined}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
         </div>
 
-        <div>
-          <label htmlFor="password" className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-3)' }}>
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            className="input"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <div className="text-right mt-1">
-            <Link href="/forgot-password" className="text-xs" style={{ color: 'var(--text-3)' }}>
-              Forgot password?
+        <div className="field">
+          <div className="field__row">
+            <label htmlFor="password" className="field__label signage">
+              Password
+            </label>
+            <Link href="/forgot-password" className="link link--ruled muted" style={{ fontSize: '0.8125rem' }}>
+              Forgot it?
             </Link>
           </div>
+          <PasswordInput
+            id="password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            visible={showPassword}
+            onToggle={() => setShowPassword((current) => !current)}
+          />
         </div>
 
-        <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign in'}
+        <button type="submit" className="btn btn--ink btn--block" disabled={loading}>
+          {loading ? 'Signing in…' : 'Sign in'}
         </button>
 
-        <p className="text-center text-sm" style={{ color: 'var(--text-3)' }}>
-          No account?{' '}
-          <Link href="/register" style={{ color: 'var(--accent)' }}>
-            Create one
+        <p className="form__aside">
+          New to AniRate?{' '}
+          <Link href="/register" className="link link--ruled link--klein">
+            Create an account
           </Link>
         </p>
       </form>

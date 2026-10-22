@@ -64,6 +64,29 @@ export class AdminController {
     return this.adminService.deleteComment(admin.id, commentId, req.ip ?? '');
   }
 
+  @Get('dub-reports')
+  dubReports() {
+    return this.adminService.listDubReports();
+  }
+
+  @Post('dub-reports/:animeId/confirm')
+  confirmDub(
+    @Param('animeId', ParseResourceIdPipe) animeId: string,
+    @CurrentUser() admin: { id: string },
+    @Req() req: Request,
+  ) {
+    return this.adminService.confirmDub(admin.id, animeId, req.ip ?? '');
+  }
+
+  @Post('dub-reports/:animeId/dismiss')
+  dismissDubReports(
+    @Param('animeId', ParseResourceIdPipe) animeId: string,
+    @CurrentUser() admin: { id: string },
+    @Req() req: Request,
+  ) {
+    return this.adminService.dismissDubReports(admin.id, animeId, req.ip ?? '');
+  }
+
   @Get('logs')
   logs(@Query() query: AdminQueryDto) {
     return this.adminService.getAdminLogs(query);
