@@ -34,7 +34,7 @@ export const getStaticProps: GetStaticProps<HomeProps> = async () => {
 const SORT_ORDER: SortKey[] = ['popular', 'rating', 'votes', 'year', 'title'];
 const SEARCH_SORT_ORDER: SortKey[] = ['relevance', ...SORT_ORDER];
 
-export default function HomePage({ search, sort, genre, genres, items, featured, page, totalItems, totalPages }: HomeProps) {
+export default function HomePage({ search, sort, genre, genres, items, featured, page, totalItems, totalPages, pending }: HomeProps) {
   const startItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endItem = Math.min(page * PAGE_SIZE, totalItems);
   const filtered = Boolean(search || genre);
@@ -96,7 +96,9 @@ export default function HomePage({ search, sort, genre, genres, items, featured,
               {search ? `Results for “${search}”` : genre ? genre : rankings ? 'Rankings' : 'The collection'}
             </h2>
             <p className="collection__count muted num" aria-live="polite">
-              {totalItems === 0
+              {pending
+                ? ''
+                : totalItems === 0
                 ? 'No works match'
                 : `${formatCount(startItem)}–${formatCount(endItem)} of ${plural(totalItems, 'work')}`}
             </p>
@@ -159,6 +161,11 @@ export default function HomePage({ search, sort, genre, genres, items, featured,
                 ))}
               </ol>
             </>
+          ) : pending ? (
+            <div className="empty">
+              <p className="title-m">The collection is being hung.</p>
+              <p className="muted">This copy of the site has just been updated. Reload the page in a moment to see every work.</p>
+            </div>
           ) : sort === 'rating' ? (
             <div className="empty">
               <p className="title-m">{filtered ? 'None of these has been rated yet.' : 'Nothing has been rated yet.'}</p>

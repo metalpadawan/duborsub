@@ -40,6 +40,26 @@ describe('validateEnvironment', () => {
     expect(validateEnvironment({ ...BASE_ENV }).EXPOSE_RESET_TOKEN).toBe(false);
   });
 
+  it('treats settings left blank as not set, as the production compose file passes them', () => {
+    const parsed = validateEnvironment({
+      ...BASE_ENV,
+      NODE_ENV: 'production',
+      FRONTEND_URL: 'https://anirate.example',
+      SMTP_HOST: '',
+      SMTP_USER: '',
+      SEED_ADMIN_EMAIL: '',
+      ALERT_WEBHOOK_URL: '  ',
+    });
+
+    expect(parsed).toMatchObject({ NODE_ENV: 'production' });
+    expect(parsed.SMTP_HOST).toBeUndefined();
+    expect(parsed.SEED_ADMIN_EMAIL).toBeUndefined();
+  });
+
+  it('still rejects a filled-in setting that is wrong', () => {
+    expect(() => validateEnvironment({ ...BASE_ENV, ALERT_WEBHOOK_URL: 'http://hooks.example/alert' })).toThrow('ALERT_WEBHOOK_URL must use HTTPS');
+  });
+
   it('refuses to expose reset tokens in production', () => {
     expect(() =>
       validateEnvironment({

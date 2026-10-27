@@ -717,6 +717,17 @@ function Members({ selfId }: { selfId: string }) {
     onError: (err) => setError(errorMessage(err, 'That did not go through.')),
   });
 
+  // Admin rights: granted to members in good standing, removable from other admins.
+  // Nobody changes their own role, so the last admin cannot lock everyone out.
+  const changeRole = useMutation({
+    mutationFn: (member: AdminUser) => adminApi.setRole(member.id, member.role === 'admin' ? 'user' : 'admin'),
+    onSuccess: () => {
+      setError('');
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
+    },
+    onError: (err) => setError(errorMessage(err, 'The role did not change.')),
+  });
+
   return (
     <section className="admin__section" aria-labelledby="members-title">
       <h2 id="members-title" className="title-m">
@@ -764,16 +775,34 @@ function Members({ selfId }: { selfId: string }) {
                     {[member.email, member.role === 'admin' ? 'Admin' : 'Member', member.isBanned ? 'Banned' : null].filter(Boolean).join(' · ')}
                   </p>
                 </div>
-                {member.role !== 'admin' && member.id !== selfId ? (
+                {member.id !== selfId ? (
                   <div className="admin__actions">
-                    <button
-                      type="button"
-                      className="btn btn--line btn--sm"
-                      disabled={moderate.isPending}
-                      onClick={() => moderate.mutate({ member, ban: !member.isBanned })}
-                    >
-                      {member.isBanned ? 'Lift ban' : 'Ban'}
-                    </button>
+                    {member.role !== 'admin' ? (
+                      <button
+                        type="button"
+                        className="btn btn--line btn--sm"
+                        disabled={moderate.isPending}
+                        onClick={() => moderate.mutate({ member, ban: !member.isBanned })}
+                      >
+                        {member.isBanned ? 'Lift ban' : 'Ban'}
+                      </button>
+                    ) : null}
+                    {!member.isBanned ? (
+                      <button
+                        type="button"
+                        className="text-action"
+                        disabled={changeRole.isPending}
+                        onClick={() => {
+                          const question =
+                            member.role === 'admin'
+                              ? `Remove admin rights from ${member.username}?`
+                              : `Make ${member.username} an admin? Admins can edit and delete titles, remove notes and ban members.`;
+                          if (window.confirm(question)) changeRole.mutate(member);
+                        }}
+                      >
+                        {member.role === 'admin' ? 'Remove admin' : 'Make admin'}
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </li>

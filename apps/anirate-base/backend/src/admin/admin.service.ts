@@ -8,7 +8,7 @@ import { DubReportsService } from '../dub-reports/dub-reports.service';
 import { MonitoringService } from '../monitoring/monitoring.service';
 import { ResolveTitleRequestDto, TitleRequestQueryDto } from '../title-requests/dto/title-requests.dto';
 import { TitleRequestsService } from '../title-requests/title-requests.service';
-import { AdminQueryDto, BanUserDto } from './dto/admin.dto';
+import { AdminQueryDto, BanUserDto, ChangeRoleDto } from './dto/admin.dto';
 
 @Injectable()
 export class AdminService {
@@ -162,6 +162,38 @@ export class AdminService {
     });
 
     return { message: 'User banned' };
+  }
+
+  // Admins promote members and step other admins down. Nobody changes their own role,
+  // so the last admin cannot lock everyone out by mistake.
+  async changeRole(adminId: string, userId: string, dto: ChangeRoleDto, ipAddress: string) {
+    if (userId === adminId) {
+      throw new ForbiddenException('You cannot change your own role');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, isBanned: true, emailVerifiedAt: true } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (dto.role === 'admin' && (user.isBanned || !user.emailVerifiedAt)) {
+      throw new ForbiddenException('Only members in good standing with a confirmed email can become admins');
+    }
+
+    if (user.role !== dto.role) {
+      await this.prisma.user.update({ where: { id: userId }, data: { role: dto.role } });
+      await this.pushLog(adminId, dto.role === 'admin' ? 'GRANT_ADMIN' : 'REVOKE_ADMIN', 'user', userId, ipAddress, null);
+      this.monitoring.recordSecurityEvent({
+        type: dto.role === 'admin' ? 'admin.role_granted' : 'admin.role_revoked',
+        severity: 'warning',
+        message: dto.role === 'admin' ? 'An administrator made a member an admin' : 'An administrator removed admin rights',
+        userId,
+        ipAddress: ipAddress || null,
+        metadata: { adminId },
+      });
+    }
+
+    return { message: dto.role === 'admin' ? 'Now an admin' : 'Now a member' };
   }
 
   async unbanUser(adminId: string, userId: string, ipAddress: string) {

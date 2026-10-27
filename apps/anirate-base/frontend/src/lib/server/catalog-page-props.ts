@@ -18,11 +18,12 @@ export class CatalogUnavailableError extends Error {
   }
 }
 
-// The bundled demo catalogue stands in only when no API is configured at all, or
-// while building without a backend running (CI), where the page is regenerated with
-// real data on its first request.
-function mayUseDemoCatalogue() {
-  return !resolveServerApiUrl() || process.env.NEXT_PHASE === 'phase-production-build';
+// The bundled demo catalogue stands in only when no API is configured at all (a local
+// frontend run on its own). A production build usually has no API to talk to yet; its
+// pages are built as placeholders and regenerate with real data on the first visit,
+// so the sample titles never reach a live site.
+function buildingWithoutApi() {
+  return Boolean(resolveServerApiUrl()) && process.env.NEXT_PHASE === 'phase-production-build';
 }
 
 export async function loadCatalogPageProps({
@@ -54,7 +55,10 @@ export async function loadCatalogPageProps({
     : null;
 
   if (!genres || !catalogPage) {
-    if (!mayUseDemoCatalogue()) {
+    if (buildingWithoutApi()) {
+      return pendingProps(normalizedSearch, normalizedSort);
+    }
+    if (resolveServerApiUrl()) {
       throw new CatalogUnavailableError();
     }
     return fallbackProps({ search: normalizedSearch, sort: normalizedSort, genre, page: requestedPage });
@@ -71,6 +75,7 @@ export async function loadCatalogPageProps({
     totalItems: catalogPage.total,
     totalPages: catalogPage.pages,
     isDemo: false,
+    pending: false,
   };
 }
 
@@ -130,5 +135,22 @@ function fallbackProps({ search, sort, genre, page }: { search: string; sort: So
     totalItems: filteredItems.length,
     totalPages,
     isDemo: true,
+    pending: false,
+  };
+}
+
+function pendingProps(search: string, sort: SortKey): HomeProps {
+  return {
+    search,
+    sort,
+    genre: '',
+    genres: ['All'],
+    items: [],
+    featured: null,
+    page: 1,
+    totalItems: 0,
+    totalPages: 1,
+    isDemo: true,
+    pending: true,
   };
 }

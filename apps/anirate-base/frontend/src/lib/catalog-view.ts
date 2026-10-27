@@ -30,6 +30,8 @@ export type HomeProps = {
   totalPages: number;
   /** True when the bundled demo catalogue stood in for the API. */
   isDemo: boolean;
+  /** True for a page built before the API was reachable; it regenerates on the first visit. */
+  pending: boolean;
 };
 
 export function defaultSortFor(search: string): SortKey {

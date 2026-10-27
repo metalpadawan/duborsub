@@ -111,7 +111,7 @@ Emails (sign-up confirmation, password resets) are printed to the backend's log 
 - **Ratings:** members rate the sub and the dub of each title separately (1 to 5), once their email address is confirmed.
 - **Dub reports:** members say when a title has an English dub; three reports, or an admin, put it on record.
 - **Title requests:** anyone can request a missing title at `/request`, or from a search with no results; admins review the queue and key titles in at `/admin`.
-- **Moderation:** members report notes; admins remove notes, ban members, and see an activity log.
+- **Moderation:** members report notes; admins remove notes, ban members, make other members admins, and see an activity log. Server errors can be posted to a Discord or Slack webhook (`ALERT_WEBHOOK_URL`).
 - **Accounts:** sign-up with email confirmation, password reset by email, My ratings, and self-service account deletion.
 
 ## Deploying

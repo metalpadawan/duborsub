@@ -57,4 +57,21 @@ describe('AdminService', () => {
       admin: { username: 'admin' },
     });
   });
+
+  it('makes a confirmed member an admin and back, logging both, but never changes its own role', async () => {
+    await service.changeRole('seed-user-admin', 'seed-user-demo', { role: 'admin' }, '127.0.0.1');
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: 'seed-user-demo' } })).role).toBe('admin');
+
+    await service.changeRole('seed-user-admin', 'seed-user-demo', { role: 'user' }, '127.0.0.1');
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: 'seed-user-demo' } })).role).toBe('user');
+    expect((await prisma.adminLog.findMany({ orderBy: { createdAt: 'asc' } })).map((log) => log.action)).toEqual(['GRANT_ADMIN', 'REVOKE_ADMIN']);
+
+    await expect(service.changeRole('seed-user-admin', 'seed-user-admin', { role: 'user' }, '127.0.0.1')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('will not make an unconfirmed or banned member an admin', async () => {
+    await createUser(prisma, { id: 'fresh', username: 'fresh', emailVerifiedAt: null });
+
+    await expect(service.changeRole('seed-user-admin', 'fresh', { role: 'admin' }, '127.0.0.1')).rejects.toBeInstanceOf(ForbiddenException);
+  });
 });

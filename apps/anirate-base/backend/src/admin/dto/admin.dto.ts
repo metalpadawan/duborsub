@@ -1,6 +1,6 @@
 // Admin DTOs capture the lightweight moderation and list-query payloads used in the demo.
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { SanitizePlainText, SanitizeQueryText } from '../../common/sanitization/sanitize.decorator';
 
 export class AdminQueryDto {
@@ -38,4 +38,9 @@ export class BanUserDto {
   @Min(1)
   @Max(365)
   durationDays?: number;
+}
+
+export class ChangeRoleDto {
+  @IsIn(['user', 'admin'])
+  role: 'user' | 'admin';
 }

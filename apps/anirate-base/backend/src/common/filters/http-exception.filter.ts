@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MonitoringService } from '../../monitoring/monitoring.service';
+import { sendErrorAlert } from '../alerts/alert-webhook';
 
 type RequestWithContext = Request & {
   requestId?: string;
@@ -42,6 +43,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       this.logger.error(
         `Unhandled exception on ${request.method} ${path} (${request.requestId ?? 'no-request-id'})`,
         exception instanceof Error ? exception.stack : String(exception),
+      );
+      // Only the unexpected ones: errors the code raises on purpose (404, 403...) are not alerts.
+      const name = exception instanceof Error ? `${exception.name}: ${exception.message}` : String(exception);
+      sendErrorAlert(
+        `${request.method} ${path} ${name}`,
+        [`AniRate server error on ${request.method} ${path}`, name, `Request ${request.requestId ?? 'unknown'}`].join('\n'),
       );
     }
 

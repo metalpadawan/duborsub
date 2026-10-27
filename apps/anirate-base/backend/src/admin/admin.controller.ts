@@ -19,7 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ResolveTitleRequestDto, TitleRequestQueryDto } from '../title-requests/dto/title-requests.dto';
 import { AdminService } from './admin.service';
-import { AdminQueryDto, BanUserDto } from './dto/admin.dto';
+import { AdminQueryDto, BanUserDto, ChangeRoleDto } from './dto/admin.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -45,6 +45,16 @@ export class AdminController {
     @Req() req: Request,
   ) {
     return this.adminService.banUser(admin.id, userId, dto, req.ip ?? '');
+  }
+
+  @Post('users/:id/role')
+  changeRole(
+    @Param('id', ParseResourceIdPipe) userId: string,
+    @CurrentUser() admin: { id: string },
+    @Body() dto: ChangeRoleDto,
+    @Req() req: Request,
+  ) {
+    return this.adminService.changeRole(admin.id, userId, dto, req.ip ?? '');
   }
 
   @Post('users/:id/unban')

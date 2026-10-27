@@ -230,6 +230,7 @@ export const adminApi = {
   users: (params: { search?: string; page?: number }) => api.get<Paginated<AdminUser>>('/admin/users', { params }),
   ban: (userId: string, data: { reason?: string; durationDays?: number }) => api.post(`/admin/users/${userId}/ban`, data),
   unban: (userId: string) => api.post(`/admin/users/${userId}/unban`),
+  setRole: (userId: string, role: 'user' | 'admin') => api.post(`/admin/users/${userId}/role`, { role }),
   logs: (page = 1) => api.get<Paginated<AdminLogItem>>('/admin/logs', { params: { page } }),
   titleRequests: (status: 'pending' | 'added' | 'rejected' = 'pending', page = 1) =>
     api.get<Paginated<AdminTitleRequest>>('/admin/title-requests', { params: { status, page } }),

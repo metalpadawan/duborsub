@@ -47,6 +47,16 @@ The first takes about ten minutes (download, Kitsu popularity, import); the seco
 
 To move an existing local database instead (accounts, ratings and all), back it up locally with `npm run db:backup`, copy the file to the server, and restore it as shown under Backups.
 
+## Admins
+
+The first admin comes from `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`. To add more, have each person sign up and confirm their email, then open **Members** in `/admin` and choose **Make admin**. **Remove admin** takes the rights away again. Every change is recorded under **Activity**, and nobody can change their own role, so the site always keeps at least one admin.
+
+## Error alerts
+
+Set `ALERT_WEBHOOK_URL` in `.env.production` to a Discord or Slack incoming-webhook URL, and unexpected server errors are posted there as they happen: the request, the error, and a request id to find the full details in `docker compose -f docker-compose.prod.yml logs backend`. Repeats of the same error are sent at most every ten minutes, and no more than twenty alerts an hour.
+
+To be told when the whole site is down, add a free uptime monitor (UptimeRobot, Better Stack) that checks `https://API_DOMAIN/api/v1/health` every few minutes; it answers 503 when the database is unreachable.
+
 ## Updating
 
 ```bash

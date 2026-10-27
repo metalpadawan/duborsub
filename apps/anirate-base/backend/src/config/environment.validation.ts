@@ -81,12 +81,20 @@ const environmentSchema = z.object({
   SMTP_USER: z.string().trim().min(1).optional(),
   SMTP_PASS: z.string().min(1).optional(),
   SMTP_FROM: z.string().trim().min(3).optional(),
+  // A Discord or Slack incoming-webhook URL for server-error alerts.
+  ALERT_WEBHOOK_URL: z.string().trim().url().refine(isSecureUrl, 'ALERT_WEBHOOK_URL must use HTTPS').optional(),
   SEED_ADMIN_EMAIL: z.string().trim().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().min(12, 'SEED_ADMIN_PASSWORD must be at least 12 characters long').optional(),
 });
 
 export function validateEnvironment(config: Record<string, unknown>) {
-  const parsed = environmentSchema.parse(config);
+  // A setting left blank counts as not set. docker-compose.prod.yml passes every
+  // optional setting through as "${NAME:-}", which is an empty string when unset,
+  // and an empty SMTP_HOST or SEED_ADMIN_EMAIL must not stop the API from starting.
+  const present = Object.fromEntries(
+    Object.entries(config).filter(([, value]) => !(typeof value === 'string' && value.trim() === '')),
+  );
+  const parsed = environmentSchema.parse(present);
   const cookieSecure = parsed.COOKIE_SECURE ?? parsed.NODE_ENV === 'production';
 
   if (parsed.NODE_ENV === 'production' && !isSecureUrl(parsed.FRONTEND_URL)) {
