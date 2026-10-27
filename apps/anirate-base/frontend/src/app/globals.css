@@ -400,6 +400,62 @@ kbd {
   background-size: 100% 1px;
 }
 
+/* Phone menu: a native disclosure whose panel drops below the masthead. */
+.menu {
+  display: none;
+  position: relative;
+}
+
+.menu__toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.25rem;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.menu__toggle::-webkit-details-marker {
+  display: none;
+}
+
+.menu__toggle::after {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-left: 0.5rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform var(--t-fast) var(--ease-out);
+}
+
+.menu[open] .menu__toggle::after {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.menu__panel {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  min-width: 13rem;
+  padding: 0.4rem 0;
+  background: var(--wall);
+  border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-lifted);
+}
+
+.menu__panel a {
+  display: block;
+  padding: 0.75rem 1.1rem;
+}
+
+.menu__panel a:hover,
+.menu__panel a:focus-visible {
+  background: var(--wall-2);
+}
+
 .masthead__user {
   display: inline-flex;
   align-items: center;
@@ -1942,6 +1998,10 @@ textarea.input {
   .masthead__nav .hide-sm {
     display: none;
   }
+
+  .masthead__nav .show-sm {
+    display: block;
+  }
 }
 
 @media (max-width: 480px) {
@@ -2227,4 +2287,173 @@ textarea.input {
   width: 1.1rem;
   height: 1.1rem;
   accent-color: var(--ink);
+}
+
+/* ───────────────────────── Request a title ───────────────────────── */
+
+.request {
+  display: grid;
+  gap: 2rem;
+  max-width: 44rem;
+  padding-block: clamp(2rem, 5vw, 4rem);
+}
+
+.request__head {
+  display: grid;
+  gap: 1rem;
+}
+
+.request__form {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.request__textarea {
+  min-height: 7rem;
+  padding-block: 0.75rem;
+  resize: vertical;
+}
+
+/* Off-screen rather than display:none, so form-filling bots still see it. */
+.request__trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.request__done {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.request__matches ul {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.request__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
+}
+
+/* "Can't find it?" under the catalogue results. */
+.collection__request {
+  margin-top: 1.5rem;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+
+.empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.colophon__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+/* ───────────────────────── Privacy and terms ───────────────────────── */
+
+.legal {
+  display: grid;
+  gap: 2rem;
+  padding-block: clamp(2rem, 5vw, 4rem);
+}
+
+.legal__head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.legal__body {
+  display: grid;
+  gap: 1rem;
+}
+
+.legal__body h2 {
+  margin-top: 1.25rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.legal__body ul {
+  display: grid;
+  gap: 0.6rem;
+  padding-left: 1.2rem;
+  list-style: square;
+}
+
+.legal__body strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Confirm-your-email reminder: a quiet band under the masthead. */
+.reminder {
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 0.875rem;
+}
+
+.reminder__inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+  padding-block: 0.65rem;
+}
+
+.reminder__action {
+  color: var(--on-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.reminder__action:hover {
+  color: var(--on-ink);
+}
+
+/* Irreversible actions only: deleting an account. */
+.btn--danger {
+  background: var(--danger);
+  color: var(--wall);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: #7d1a14;
+}
+
+.account__form {
+  display: grid;
+  gap: 1rem;
+  max-width: 34rem;
+}
+
+.account__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+}
+
+.admin__textarea--short {
+  min-height: 5rem;
+}
+
+.admin__detail {
+  margin-top: 0.4rem;
+  max-width: 70ch;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
 }

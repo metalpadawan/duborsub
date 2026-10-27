@@ -1,7 +1,7 @@
 import type { Anime, Genre, PaginatedAnime } from '@/lib/api';
 import { catalogItems as fallbackCatalogItems, genreOptions as fallbackGenreOptions } from '@/lib/catalog-data';
 import type { SortKey } from '@/lib/catalog-view';
-import { resolveServerApiUrl } from '@/lib/server/api-base';
+import { internalApiHeaders, resolveServerApiUrl } from '@/lib/server/api-base';
 
 // The catalogue holds tens of thousands of titles, so search, sorting and paging
 // happen in the API and each page asks for just the slice it shows. Only the genre
@@ -40,7 +40,7 @@ let featuredCache: { expiresAt: number; items: Anime[] } | null = null;
 async function getJson<T>(baseUrl: string, path: string): Promise<T> {
   const url = `${baseUrl}${path}`;
   const response = await fetch(url, {
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', ...internalApiHeaders() },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 

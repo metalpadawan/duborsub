@@ -1,5 +1,5 @@
 import type { AnimeDetail } from '@/lib/api';
-import { resolveServerApiUrl } from '@/lib/server/api-base';
+import { internalApiHeaders, resolveServerApiUrl } from '@/lib/server/api-base';
 
 export type AnimeLookup =
   | { status: 'found'; anime: AnimeDetail }
@@ -16,7 +16,7 @@ export async function fetchAnime(id: string): Promise<AnimeLookup> {
 
   try {
     const response = await fetch(`${baseUrl}/anime/${encodeURIComponent(id)}`, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...internalApiHeaders() },
       cache: 'no-store',
       signal: AbortSignal.timeout(5_000),
     });

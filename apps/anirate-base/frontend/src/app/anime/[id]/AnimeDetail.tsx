@@ -125,8 +125,8 @@ function AnimeDetailContent({ animeId, initialAnime }: Props) {
             </header>
 
             <SplitSection anime={anime} split={split} distribution={distributionQuery.data ?? null} />
-            <RateSection anime={anime} signedIn={Boolean(user)} />
-            <NotesSection animeId={anime.id} userId={user?.id ?? null} />
+            <RateSection anime={anime} signedIn={Boolean(user)} verified={Boolean(user?.emailVerified)} />
+            <NotesSection animeId={anime.id} userId={user?.id ?? null} verified={Boolean(user?.emailVerified)} />
           </div>
         </article>
       </main>
@@ -298,7 +298,13 @@ function Dist({ counts, lead, label }: { counts: number[]; lead: boolean; label:
   );
 }
 
-function RateSection({ anime, signedIn }: { anime: AnimeDetail; signedIn: boolean }) {
+// Rating, notes and dub reports need a confirmed email address, which keeps one
+// person from voting through a stack of throwaway accounts.
+function ConfirmFirst({ action }: { action: string }) {
+  return <p className="muted">Confirm your email address to {action}. The link is in your inbox; the reminder at the top can send it again.</p>;
+}
+
+function RateSection({ anime, signedIn, verified }: { anime: AnimeDetail; signedIn: boolean; verified: boolean }) {
   return (
     <section className="section" aria-labelledby="rate-title">
       <div className="section__head">
@@ -306,7 +312,9 @@ function RateSection({ anime, signedIn }: { anime: AnimeDetail; signedIn: boolea
           Your rating
         </h2>
       </div>
-      {signedIn ? (
+      {signedIn && !verified ? (
+        <ConfirmFirst action="rate the sub and the dub" />
+      ) : signedIn ? (
         <RatePanel anime={anime} />
       ) : (
         <div style={{ display: 'grid', gap: '1rem', justifyItems: 'start' }}>
@@ -481,10 +489,16 @@ function TileRow({ label, value, onRate }: { label: string; value: number | null
   );
 }
 
-function NotesSection({ animeId, userId }: { animeId: string; userId: string | null }) {
+function NotesSection({ animeId, userId, verified }: { animeId: string; userId: string | null; verified: boolean }) {
   const queryClient = useQueryClient();
   const [text, setText] = useState('');
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [reported, setReported] = useState<Set<string>>(new Set());
+
+  const reportMutation = useMutation({
+    mutationFn: (commentId: string) => commentsApi.report(animeId, commentId),
+    onSuccess: (_response, commentId) => setReported((current) => new Set(current).add(commentId)),
+  });
 
   const commentsQuery = useQuery({
     queryKey: ['comments', animeId],
@@ -523,7 +537,9 @@ function NotesSection({ animeId, userId }: { animeId: string; userId: string | n
         </span>
       </div>
 
-      {userId ? (
+      {userId && !verified ? (
+        <ConfirmFirst action="leave notes" />
+      ) : userId ? (
         <form
           className="composer"
           onSubmit={(event) => {
@@ -591,6 +607,9 @@ function NotesSection({ animeId, userId }: { animeId: string; userId: string | n
                 onCancelDelete={() => setConfirming(null)}
                 onDelete={() => deleteMutation.mutate(note.id)}
                 deleting={deleteMutation.isPending && confirming === note.id}
+                canReport={Boolean(userId && verified && note.user?.id !== userId)}
+                reported={reported.has(note.id)}
+                onReport={() => reportMutation.mutate(note.id)}
               />
             </li>
           ))}
@@ -608,6 +627,9 @@ function Note({
   onCancelDelete,
   onDelete,
   deleting,
+  canReport,
+  reported,
+  onReport,
 }: {
   note: CommentItem;
   own: boolean;
@@ -616,6 +638,9 @@ function Note({
   onCancelDelete: () => void;
   onDelete: () => void;
   deleting: boolean;
+  canReport: boolean;
+  reported: boolean;
+  onReport: () => void;
 }) {
   const removed = REMOVED_CONTENT.has(note.content);
 
@@ -643,6 +668,19 @@ function Note({
             ) : (
               <button type="button" className="text-action" onClick={onAskDelete}>
                 Delete
+              </button>
+            )}
+          </span>
+        ) : null}
+        {canReport && !removed ? (
+          <span style={{ marginLeft: 'auto' }}>
+            {reported ? (
+              <span className="muted" style={{ fontSize: '0.8125rem' }}>
+                Reported to the moderators
+              </span>
+            ) : (
+              <button type="button" className="text-action" onClick={onReport}>
+                Report
               </button>
             )}
           </span>

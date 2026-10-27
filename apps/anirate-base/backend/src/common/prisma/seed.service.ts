@@ -123,7 +123,7 @@ export class SeedService implements OnApplicationBootstrap {
 
     const passwordHash = await bcrypt.hash('Password123!', 10);
     await this.prisma.user.createMany({
-      data: DEMO_USERS.map((user) => ({ ...user, passwordHash })),
+      data: DEMO_USERS.map((user) => ({ ...user, passwordHash, emailVerifiedAt: new Date() })),
     });
 
     if ((await this.prisma.anime.count()) === 0) {
@@ -205,6 +205,7 @@ export class SeedService implements OnApplicationBootstrap {
         email: email.toLowerCase(),
         passwordHash: await bcrypt.hash(password, 12),
         role: 'admin',
+        emailVerifiedAt: new Date(),
       },
     });
   }

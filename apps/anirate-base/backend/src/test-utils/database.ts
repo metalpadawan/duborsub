@@ -36,6 +36,7 @@ export async function createUser(prisma: PrismaClient, overrides: Partial<User> 
       bannedUntil: overrides.bannedUntil ?? null,
       failedLoginAttempts: overrides.failedLoginAttempts ?? 0,
       lockedUntil: overrides.lockedUntil ?? null,
+      emailVerifiedAt: overrides.emailVerifiedAt === undefined ? new Date() : overrides.emailVerifiedAt,
     },
   });
 }

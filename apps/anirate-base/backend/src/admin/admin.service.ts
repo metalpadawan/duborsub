@@ -6,6 +6,8 @@ import { CommentsService } from '../comments/comments.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { DubReportsService } from '../dub-reports/dub-reports.service';
 import { MonitoringService } from '../monitoring/monitoring.service';
+import { ResolveTitleRequestDto, TitleRequestQueryDto } from '../title-requests/dto/title-requests.dto';
+import { TitleRequestsService } from '../title-requests/title-requests.service';
 import { AdminQueryDto, BanUserDto } from './dto/admin.dto';
 
 @Injectable()
@@ -15,11 +17,39 @@ export class AdminService {
     private readonly commentsService: CommentsService,
     private readonly monitoring: MonitoringService,
     private readonly dubReports: DubReportsService,
+    private readonly titleRequests: TitleRequestsService,
   ) {}
+
+  listTitleRequests(query: TitleRequestQueryDto) {
+    return this.titleRequests.list(query);
+  }
+
+  async resolveTitleRequest(adminId: string, id: string, dto: ResolveTitleRequestDto, ipAddress: string) {
+    const result = await this.titleRequests.resolve(adminId, id, dto);
+    await this.pushLog(adminId, dto.status === 'added' ? 'ADD_REQUESTED_TITLE' : 'REJECT_TITLE_REQUEST', 'title_request', id, ipAddress, {
+      title: result.title,
+      animeId: dto.animeId ?? null,
+    });
+    return { message: result.message };
+  }
+
+  listReportedComments() {
+    return this.commentsService.listReported();
+  }
+
+  listRecentComments(query: AdminQueryDto) {
+    return this.commentsService.listRecent(query.page ?? 1, query.limit ?? 20);
+  }
+
+  async dismissCommentReports(adminId: string, commentId: string, ipAddress: string) {
+    await this.commentsService.dismissReports(commentId);
+    await this.pushLog(adminId, 'DISMISS_COMMENT_REPORTS', 'comment', commentId, ipAddress, null);
+    return { message: 'Reports dismissed' };
+  }
 
   async getDashboardStats() {
     // The dashboard stays intentionally simple: totals, a small top list, and recent admin events.
-    const [totalUsers, totalAnime, totalRatings, totalComments, dubGroups, topRatedAnime, recentActivity] = await Promise.all([
+    const [totalUsers, totalAnime, totalRatings, totalComments, dubGroups, topRatedAnime, recentActivity, pendingTitleRequests, reportGroups] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.anime.count(),
       this.prisma.rating.count(),
@@ -33,10 +63,20 @@ export class AdminService {
         select: { id: true, title: true },
       }),
       this.prisma.adminLog.findMany({ orderBy: { createdAt: 'desc' }, take: 20 }),
+      this.titleRequests.countPending(),
+      this.prisma.commentReport.groupBy({ by: ['commentId'] }),
     ]);
 
     return {
-      counts: { totalUsers, totalAnime, totalRatings, totalComments, pendingDubReports: dubGroups.length },
+      counts: {
+        totalUsers,
+        totalAnime,
+        totalRatings,
+        totalComments,
+        pendingDubReports: dubGroups.length,
+        pendingTitleRequests,
+        reportedComments: reportGroups.length,
+      },
       topRatedAnime,
       recentActivity,
     };

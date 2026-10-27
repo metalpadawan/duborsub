@@ -74,6 +74,13 @@ const environmentSchema = z.object({
     .trim()
     .refine((value) => /^postgres(ql)?:\/\//.test(value), 'DATABASE_URL must be a postgresql:// connection string'),
   EXPOSE_RESET_TOKEN:z.preprocess(parseBoolean, z.boolean()).default(false),
+  // Shared with the website's server so its page renders are not rate-limited.
+  INTERNAL_API_KEY: z.string().trim().min(32, 'INTERNAL_API_KEY must be at least 32 characters long').optional(),
+  SMTP_HOST: z.string().trim().min(1).optional(),
+  SMTP_PORT: z.preprocess(parseInteger, z.number().int().min(1).max(65535)).optional(),
+  SMTP_USER: z.string().trim().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  SMTP_FROM: z.string().trim().min(3).optional(),
   SEED_ADMIN_EMAIL: z.string().trim().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().min(12, 'SEED_ADMIN_PASSWORD must be at least 12 characters long').optional(),
 });

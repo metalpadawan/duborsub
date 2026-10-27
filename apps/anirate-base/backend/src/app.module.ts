@@ -12,6 +12,8 @@ import { CommentsModule } from './comments/comments.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { validateEnvironment } from './config/environment.validation';
 import { DubReportsModule } from './dub-reports/dub-reports.module';
+import { MailModule } from './mail/mail.module';
+import { TitleRequestsModule } from './title-requests/title-requests.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { RatingsModule } from './ratings/ratings.module';
 
@@ -29,11 +31,13 @@ import { RatingsModule } from './ratings/ratings.module';
       },
     ]),
     PrismaModule,
+    MailModule,
     MonitoringModule,
     AuthModule,
     AnimeModule,
     RatingsModule,
     DubReportsModule,
+    TitleRequestsModule,
     CommentsModule,
     AdminModule,
   ],

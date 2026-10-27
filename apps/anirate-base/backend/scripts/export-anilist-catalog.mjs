@@ -4,8 +4,10 @@
 //
 //   node scripts/export-anilist-catalog.mjs [--resume] [--out <dir>]
 //
-// Paging is by ascending AniList ID (id_greater), not page number, so the walk is
-// not subject to deep-pagination limits and can resume from its checkpoint.
+// AniList stops any listing at 5,000 results and has no "after this id" filter, so
+// the walk asks for known ids instead: every AniList id in the offline catalogue
+// (export-offline-catalog.mjs, run first), 50 per request. It can resume from its
+// checkpoint.
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { CATALOG_EXPORT_DIR, loadCatalogIds, parseArgs, writeAtomic } from './lib/db.mjs';
@@ -19,12 +21,12 @@ const MIN_INTERVAL_MS = 2_100;
 const args = parseArgs(process.argv.slice(2));
 const outDir = resolve(String(args.out ?? CATALOG_EXPORT_DIR));
 const checkpointFile = resolve(outDir, 'anilist-anime.checkpoint.json');
+const offlineFile = resolve(CATALOG_EXPORT_DIR, 'anime-catalogue.json');
 
 const QUERY = `
-  query ExportAnime($afterId: Int!, $perPage: Int!, $formats: [MediaFormat]) {
+  query ExportAnime($ids: [Int], $perPage: Int!, $formats: [MediaFormat]) {
     Page(page: 1, perPage: $perPage) {
-      pageInfo { hasNextPage }
-      media(type: ANIME, isAdult: false, format_in: $formats, id_greater: $afterId, sort: ID) {
+      media(type: ANIME, isAdult: false, format_in: $formats, id_in: $ids, sort: ID) {
         id
         idMal
         title { romaji english native }
@@ -57,19 +59,30 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
   const inAniRate = (await loadCatalogIds()).anilist;
 
+  if (!existsSync(offlineFile)) {
+    console.error(`${offlineFile} not found. Run "npm run export:anime:offline" first: it lists the AniList ids to fetch.`);
+    return 1;
+  }
+
+  const ids = [...new Set(JSON.parse(readFileSync(offlineFile, 'utf8')).items.map((item) => item.anilistId).filter(Boolean))].sort(
+    (left, right) => left - right,
+  );
+  const batches = [];
+  for (let index = 0; index < ids.length; index += PER_PAGE) batches.push(ids.slice(index, index + PER_PAGE));
+
   let items = [];
-  let afterId = 0;
+  let batchIndex = 0;
   if (args.resume && existsSync(checkpointFile)) {
     const checkpoint = JSON.parse(readFileSync(checkpointFile, 'utf8'));
     items = checkpoint.items;
-    afterId = checkpoint.afterId;
-    console.log(`Resuming after AniList ID ${afterId} with ${items.length} titles already fetched.`);
+    batchIndex = checkpoint.batchIndex ?? 0;
+    console.log(`Resuming at request ${batchIndex + 1} of ${batches.length} with ${items.length} titles already fetched.`);
   }
 
-  let requests = 0;
+  console.log(`Fetching ${ids.length} AniList titles in ${batches.length - batchIndex} requests (about ${Math.ceil(((batches.length - batchIndex) * MIN_INTERVAL_MS) / 60_000)} minutes)…`);
   let lastRequestAt = 0;
 
-  while (true) {
+  for (; batchIndex < batches.length; batchIndex += 1) {
     const wait = lastRequestAt + MIN_INTERVAL_MS - Date.now();
     if (wait > 0) {
       await sleep(wait);
@@ -78,28 +91,19 @@ async function main() {
     lastRequestAt = Date.now();
     let page;
     try {
-      page = await fetchPage(afterId);
+      page = await fetchPage(batches[batchIndex]);
     } catch (error) {
-      saveCheckpoint(items, afterId);
+      saveCheckpoint(items, batchIndex);
       console.error(`Stopped: ${error.message}`);
-      console.error(`Progress is saved. Rerun with --resume to continue after AniList ID ${afterId}.`);
+      console.error(`Progress is saved. Rerun with --resume to continue at request ${batchIndex + 1}.`);
       return 1;
     }
 
-    requests += 1;
-    const media = page.media ?? [];
-    items.push(...media.map((entry) => toRow(entry, inAniRate)));
-    if (media.length) {
-      afterId = media[media.length - 1].id;
-    }
+    items.push(...(page.media ?? []).map((entry) => toRow(entry, inAniRate)));
 
-    if (requests % 20 === 0) {
-      saveCheckpoint(items, afterId);
-      console.log(`${items.length} titles so far (through AniList ID ${afterId})…`);
-    }
-
-    if (!page.pageInfo?.hasNextPage || media.length === 0) {
-      break;
+    if ((batchIndex + 1) % 20 === 0) {
+      saveCheckpoint(items, batchIndex + 1);
+      console.log(`${items.length} titles so far (${batchIndex + 1} of ${batches.length} requests)…`);
     }
   }
 
@@ -107,11 +111,11 @@ async function main() {
   return 0;
 }
 
-async function fetchPage(afterId, attempt = 1) {
+async function fetchPage(ids, attempt = 1) {
   const response = await fetch(ANILIST_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ query: QUERY, variables: { afterId, perPage: PER_PAGE, formats: FORMATS } }),
+    body: JSON.stringify({ query: QUERY, variables: { ids, perPage: PER_PAGE, formats: FORMATS } }),
     signal: AbortSignal.timeout(30_000),
   });
 
@@ -125,7 +129,7 @@ async function fetchPage(afterId, attempt = 1) {
     const delay = Number.isFinite(retryAfter) && retryAfter > 0 ? (retryAfter + 1) * 1000 : 2 ** attempt * 1000;
     console.log(`AniList answered ${response.status}; waiting ${Math.round(delay / 1000)}s before retrying.`);
     await sleep(delay);
-    return fetchPage(afterId, attempt + 1);
+    return fetchPage(ids, attempt + 1);
   }
 
   if (!response.ok) {
@@ -234,8 +238,8 @@ function writeOutputs(items) {
   console.log(`CSV:  ${csvPath}`);
 }
 
-function saveCheckpoint(items, afterId) {
-  writeAtomic(checkpointFile, JSON.stringify({ afterId, items }));
+function saveCheckpoint(items, batchIndex) {
+  writeAtomic(checkpointFile, JSON.stringify({ batchIndex, items }));
 }
 
 function csvCell(value) {

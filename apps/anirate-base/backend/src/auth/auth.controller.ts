@@ -3,6 +3,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -17,7 +18,7 @@ import { Request, Response } from 'express';
 import { TrustedOriginGuard } from '../common/guards/trusted-origin.guard';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
-import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth.dto';
+import { DeleteAccountDto, ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto, VerifyEmailDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
@@ -81,6 +82,30 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() user: { id: string }) {
     return this.authService.getMe(user.id);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 15 * 60_000 } })
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 3, ttl: 15 * 60_000 } })
+  resendVerification(@CurrentUser() user: { id: string }) {
+    return this.authService.resendVerification(user.id);
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 15 * 60_000 } })
+  async deleteAccount(@CurrentUser() user: { id: string }, @Body() dto: DeleteAccountDto, @Res() res: Response) {
+    const result = await this.authService.deleteAccount(user.id, dto.password);
+    res.clearCookie('refresh_token', this.getRefreshCookieOptions());
+    res.json(result);
   }
 
   private getRefreshCookieOptions() {

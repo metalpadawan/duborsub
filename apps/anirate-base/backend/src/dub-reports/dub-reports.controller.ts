@@ -3,6 +3,7 @@
 import { Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 import { ParseResourceIdPipe } from '../common/pipes/parse-resource-id.pipe';
 import { DubReportsService } from './dub-reports.service';
 
@@ -22,7 +23,7 @@ export class DubReportsController {
   }
 
   @Post('reports')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, VerifiedEmailGuard)
   report(@Param('animeId', ParseResourceIdPipe) animeId: string, @CurrentUser() user: { id: string }) {
     return this.dubReports.report(animeId, user.id);
   }

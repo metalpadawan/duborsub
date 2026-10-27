@@ -75,3 +75,88 @@ jobs:
       - run: npm run build
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+  # The main visitor, member and admin flows in a real browser, against the built
+  # backend and website and a fresh database seeded with the demo accounts.
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: anirate
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: anime_platform_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U anirate -d anime_platform_e2e"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://anirate@localhost:5432/anime_platform_e2e?schema=public
+      FRONTEND_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Generate throwaway secrets for this run
+        run: |
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          key=$(openssl rand -hex 32)
+          echo "::add-mask::$key"
+          echo "INTERNAL_API_KEY=$key" >> "$GITHUB_ENV"
+          echo "E2E_INTERNAL_KEY=$key" >> "$GITHUB_ENV"
+      - name: Start the backend
+        working-directory: apps/anirate-base/backend
+        # Development mode seeds the demo and admin accounts the tests sign in with.
+        env:
+          NODE_ENV: development
+        run: |
+          npm ci
+          npx prisma migrate deploy
+          npm run build
+          nohup node dist/main > backend.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:4000/api/v1/health && break; sleep 2; done
+      - name: Start the website
+        working-directory: apps/anirate-base/frontend
+        run: |
+          npm ci
+          npm run build
+          nohup npx next start -p 3000 > frontend.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/login && break; sleep 2; done
+      - name: Run the browser tests
+        working-directory: apps/anirate-base/frontend
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test
+      - name: Keep the traces and server logs when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            apps/anirate-base/frontend/test-results
+            apps/anirate-base/backend/backend.log
+            apps/anirate-base/frontend/frontend.log
+          retention-days: 7
+
+  # The production images build (docker-compose.prod.yml uses these Dockerfiles).
+  docker:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the API image
+        run: docker build -t anirate-api:ci apps/anirate-base/backend
+      - name: Build the website image
+        run: >-
+          docker build -t anirate-web:ci
+          --build-arg NEXT_PUBLIC_API_URL=https://api.example.com/api/v1
+          --build-arg NEXT_PUBLIC_SITE_URL=https://example.com
+          apps/anirate-base/frontend

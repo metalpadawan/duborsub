@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import imageHosts from './src/lib/image-hosts.json' with { type: 'json' };
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV !== 'production';
@@ -36,8 +37,18 @@ const contentSecurityPolicy = [
 ].join('; ');
 
 const nextConfig = {
+  // A self-contained server bundle for the Docker image (see Dockerfile).
+  output: 'standalone',
   turbopack: {
     root: appRoot,
+  },
+  // Covers are resized and re-encoded by Next's optimizer, from these hosts only.
+  images: {
+    remotePatterns: imageHosts.map((hostname) => ({ protocol: 'https', hostname })),
+    // WebP only: AVIF is a little smaller but takes seconds to encode a cover the
+    // first time it is shown, and most covers are shown for the first time.
+    formats: ['image/webp'],
+    minimumCacheTTL: 60 * 60 * 24 * 30,
   },
   async headers() {
     return [

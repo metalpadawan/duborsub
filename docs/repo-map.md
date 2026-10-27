@@ -43,7 +43,8 @@ Each pack assumes the previous layer already exists.
 ## Database Assets
 
 - `apps/anirate-base/backend/prisma/schema.prisma` is the database model, and the SQL in `prisma/migrations/` is the canonical schema.
-- `docker-compose.yml` runs PostgreSQL locally; `database/init/` creates the separate test database on its first start.
+- `docker-compose.yml` runs PostgreSQL locally; `database/init/` creates the separate test database on its first start, and `database/setup-local.mjs` (run by `npm run db:up`) generates the local passwords and keys into git-ignored `.env` files.
+- `docker-compose.prod.yml`, `deploy/Caddyfile` and the two Dockerfiles run the site in production; `docs/deploy.md` walks through it, and `database/backup.mjs` takes the backups.
 
 ## Cleanup Notes
 

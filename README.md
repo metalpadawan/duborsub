@@ -80,6 +80,19 @@ npm run lint
 npm run test
 ```
 
+The browser tests (`apps/anirate-base/frontend/e2e`) drive the running site through the main visitor, member and admin flows. Start the site first, then:
+
+```powershell
+npm --prefix apps/anirate-base/frontend run test:e2e
+```
+
+On a machine with 8 GB of memory, the dev servers (especially the Next.js one, which compiles pages as you visit them) can run out of room alongside Docker, VS Code and a browser, and stop without an error. When that happens, run the built apps instead, which use a fraction of the memory:
+
+```powershell
+npm run build        # after changing code
+npm run start:local  # database, API and website, without live reloading
+```
+
 Then open:
 
 - `http://localhost:3000`
@@ -89,6 +102,21 @@ Demo accounts:
 
 - `demo@example.com` / `Password123!`
 - `admin@example.com` / `Password123!`
+
+Emails (sign-up confirmation, password resets) are printed to the backend's log in development until `SMTP_*` settings are added to `apps/anirate-base/backend/.env`; follow the link from the log to confirm a new account.
+
+## What The Site Does
+
+- **Catalogue:** about 38,000 anime with search in English, Japanese and romaji, sorted by popularity, rating, votes, year or title.
+- **Ratings:** members rate the sub and the dub of each title separately (1 to 5), once their email address is confirmed.
+- **Dub reports:** members say when a title has an English dub; three reports, or an admin, put it on record.
+- **Title requests:** anyone can request a missing title at `/request`, or from a search with no results; admins review the queue and key titles in at `/admin`.
+- **Moderation:** members report notes; admins remove notes, ban members, and see an activity log.
+- **Accounts:** sign-up with email confirmation, password reset by email, My ratings, and self-service account deletion.
+
+## Deploying
+
+[docs/deploy.md](docs/deploy.md) covers putting the site on a server with HTTPS (`docker-compose.prod.yml`), email, loading the catalogue, updates, and daily backups (`npm run db:backup` locally, `node database/backup.mjs --prod` on the server).
 
 ## Git And Contribution Docs
 

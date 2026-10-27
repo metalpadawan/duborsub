@@ -14,9 +14,11 @@ import {
 import { ParseResourceIdPipe } from '../common/pipes/parse-resource-id.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 import {
   CommentsQueryDto,
   CreateCommentDto,
+  ReportCommentDto,
   UpdateCommentDto,
   VoteCommentDto,
 } from './dto/comments.dto';
@@ -32,7 +34,7 @@ export class CommentsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, VerifiedEmailGuard)
   create(
     @Param('animeId', ParseResourceIdPipe) animeId: string,
     @CurrentUser() user: { id: string },
@@ -42,7 +44,7 @@ export class CommentsController {
   }
 
   @Patch(':commentId')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, VerifiedEmailGuard)
   update(
     @Param('animeId', ParseResourceIdPipe) animeId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
@@ -63,7 +65,7 @@ export class CommentsController {
   }
 
   @Post(':commentId/like')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, VerifiedEmailGuard)
   like(
     @Param('animeId', ParseResourceIdPipe) animeId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
@@ -71,6 +73,17 @@ export class CommentsController {
     @Body() dto: VoteCommentDto,
   ) {
     return this.commentsService.vote(user.id, animeId, commentId, dto);
+  }
+
+  @Post(':commentId/report')
+  @UseGuards(JwtAuthGuard, VerifiedEmailGuard)
+  report(
+    @Param('animeId', ParseResourceIdPipe) animeId: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: ReportCommentDto,
+  ) {
+    return this.commentsService.report(user.id, animeId, commentId, dto);
   }
 
   @Delete(':commentId/like')

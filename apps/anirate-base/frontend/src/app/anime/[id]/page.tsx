@@ -15,9 +15,26 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     return { title: 'Not in the collection' };
   }
 
+  const { anime } = lookup;
+  const split =
+    anime.avgSubRating != null || anime.avgDubRating != null
+      ? ` Sub ${anime.avgSubRating?.toFixed(1) ?? '–'}, dub ${anime.avgDubRating?.toFixed(1) ?? '–'} out of 5.`
+      : '';
+  const description = `Sub or dub? Ratings for ${anime.title}, compared side by side.${split}`;
+  const path = `/anime/${anime.id}`;
+
+  // A shared link shows the cover; titles without one fall back to the site card.
   return {
-    title: lookup.anime.title,
-    description: `Sub and dub ratings for ${lookup.anime.title}, compared side by side on AniRate.`,
+    title: anime.title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      title: `${anime.title} · Sub or dub?`,
+      description,
+      url: path,
+      ...(anime.coverImageUrl ? { images: [{ url: anime.coverImageUrl, alt: `Cover art for ${anime.title}` }] } : {}),
+    },
+    twitter: { card: anime.coverImageUrl ? 'summary' : 'summary_large_image' },
   };
 }
 

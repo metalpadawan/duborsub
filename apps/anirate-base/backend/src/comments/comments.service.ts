@@ -3,7 +3,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { CommentsQueryDto, CreateCommentDto, UpdateCommentDto, VoteCommentDto } from './dto/comments.dto';
+import { CommentsQueryDto, CreateCommentDto, ReportCommentDto, UpdateCommentDto, VoteCommentDto } from './dto/comments.dto';
 
 const AUTHOR = { select: { id: true, username: true } } as const;
 
@@ -20,6 +20,15 @@ const THREAD_SELECT = {
 } satisfies Prisma.CommentSelect;
 
 type ThreadRow = Prisma.CommentGetPayload<{ select: typeof THREAD_SELECT }>;
+
+const ADMIN_COMMENT_SELECT = {
+  id: true,
+  content: true,
+  isDeleted: true,
+  createdAt: true,
+  user: AUTHOR,
+  anime: { select: { id: true, title: true } },
+} satisfies Prisma.CommentSelect;
 
 @Injectable()
 export class CommentsService {
@@ -118,9 +127,72 @@ export class CommentsService {
     return { message: 'Vote removed' };
   }
 
+  // One report per viewer per note; reporting again just keeps the first.
+  async report(userId: string, animeId: string, commentId: string, dto: ReportCommentDto) {
+    const comment = await this.findComment(commentId, animeId);
+    if (comment.userId === userId) {
+      throw new BadRequestException('You cannot report your own note');
+    }
+
+    await this.prisma.commentReport.createMany({
+      data: [{ id: randomUUID(), commentId, userId, reason: dto.reason?.trim() || null }],
+      skipDuplicates: true,
+    });
+    return { message: 'Reported to the moderators' };
+  }
+
   async softDeleteByAdmin(commentId: string) {
     await this.findComment(commentId);
-    await this.prisma.comment.update({ where: { id: commentId }, data: { isDeleted: true, content: '[removed by moderator]' } });
+    // Removing a note settles the reports about it.
+    await this.prisma.$transaction([
+      this.prisma.comment.update({ where: { id: commentId }, data: { isDeleted: true, content: '[removed by moderator]' } }),
+      this.prisma.commentReport.deleteMany({ where: { commentId } }),
+    ]);
+  }
+
+  /** Reported notes, most-reported first, for the moderators. */
+  async listReported() {
+    const groups = await this.prisma.commentReport.groupBy({ by: ['commentId'], _count: { _all: true } });
+    const comments = await this.prisma.comment.findMany({
+      where: { id: { in: groups.map((group) => group.commentId) } },
+      select: {
+        ...ADMIN_COMMENT_SELECT,
+        reports: { select: { reason: true }, orderBy: { createdAt: 'asc' } },
+      },
+    });
+    const counts = new Map(groups.map((group) => [group.commentId, group._count._all]));
+
+    return {
+      items: comments
+        .map(({ reports, ...comment }) => ({
+          ...comment,
+          reports: counts.get(comment.id) ?? 0,
+          reasons: reports.map((report) => report.reason).filter((reason): reason is string => Boolean(reason)),
+        }))
+        .sort((left, right) => right.reports - left.reports),
+    };
+  }
+
+  async dismissReports(commentId: string) {
+    await this.prisma.commentReport.deleteMany({ where: { commentId } });
+  }
+
+  /** The newest notes across the site, for the moderators. */
+  async listRecent(page: number, limit: number) {
+    const [total, comments] = await Promise.all([
+      this.prisma.comment.count(),
+      this.prisma.comment.findMany({
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        select: { ...ADMIN_COMMENT_SELECT, _count: { select: { reports: true } } },
+      }),
+    ]);
+
+    return {
+      items: comments.map(({ _count, ...comment }) => ({ ...comment, reports: _count.reports })),
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+    };
   }
 
   private async serializeComment(commentId: string) {

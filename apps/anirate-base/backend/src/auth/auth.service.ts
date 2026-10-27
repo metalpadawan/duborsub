@@ -11,11 +11,15 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Prisma, User } from '@prisma/client';
 import { createHash, randomBytes, randomUUID } from 'crypto';
+import { refreshAnimeStats } from '../common/prisma/anime-stats';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { MonitoringService } from '../monitoring/monitoring.service';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth.dto';
 
 const LOCKOUT_MINUTES = 15;
+const VERIFICATION_TTL_MS = 48 * 60 * 60 * 1000;
+const RESET_TTL_MS = 60 * 60 * 1000;
 const MAX_FAILED_ATTEMPTS = 5;
 // A rotated refresh token presented again within this window is treated as a
 // concurrent refresh (two tabs, a retried request), not as theft.
@@ -31,6 +35,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly monitoring: MonitoringService,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -45,6 +50,7 @@ export class AuthService {
       const user = await this.prisma.user.create({
         data: { id: randomUUID(), username: dto.username, email: dto.email.toLowerCase(), passwordHash, role: 'user' },
       });
+      await this.sendVerificationEmail(user);
       return this.toPublicUser(user);
     } catch (error) {
       // A concurrent registration can take the email or username while this one
@@ -312,9 +318,10 @@ export class AuthService {
         id: randomUUID(),
         userId: user.id,
         tokenHash: this.hashToken(token),
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + RESET_TTL_MS),
       },
     });
+    await this.mail.sendPasswordReset(user.email, user.username, this.frontendLink('/reset-password', token));
 
     const response: Record<string, unknown> = {
       message: 'If that email exists, a reset link has been sent',
@@ -382,8 +389,78 @@ export class AuthService {
     return this.toPublicUser(user);
   }
 
+  async verifyEmail(rawToken: string) {
+    const record = await this.prisma.emailVerificationToken.findUnique({ where: { tokenHash: this.hashToken(rawToken) } });
+    if (!record || record.usedAt || record.expiresAt <= new Date()) {
+      throw new BadRequestException('This confirmation link has expired or was already used');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.emailVerificationToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+      this.prisma.user.update({ where: { id: record.userId }, data: { emailVerifiedAt: new Date() } }),
+    ]);
+    return { message: 'Email address confirmed' };
+  }
+
+  async resendVerification(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.emailVerifiedAt) {
+      await this.sendVerificationEmail(user);
+    }
+    return { message: 'If your address still needs confirming, a new link is on its way' };
+  }
+
+  // Deleting an account removes the member and, by cascade, their ratings, notes,
+  // votes, reports and sessions. Rating totals of the titles they rated are recounted.
+  async deleteAccount(userId: string, password: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+      throw new UnauthorizedException('That password is not right');
+    }
+
+    if (user.role === 'admin') {
+      // Admin history references the account; another admin has to remove it.
+      throw new ForbiddenException('Admin accounts cannot be deleted from here');
+    }
+
+    const rated = await this.prisma.rating.findMany({ where: { userId }, select: { animeId: true } });
+    await this.prisma.user.delete({ where: { id: userId } });
+    for (const { animeId } of rated) {
+      await this.prisma.$transaction((tx) => refreshAnimeStats(tx, animeId));
+    }
+
+    this.monitoring.recordSecurityEvent({
+      type: 'auth.account_deleted',
+      severity: 'info',
+      message: 'A member deleted their account',
+      userId,
+    });
+    return { message: 'Account deleted' };
+  }
+
   getRefreshTokenTtlMs() {
     return this.config.getOrThrow<number>('REFRESH_TOKEN_TTL_HOURS') * 60 * 60 * 1000;
+  }
+
+  // Earlier unused links are discarded, so only the newest one works.
+  private async sendVerificationEmail(user: User) {
+    const token = randomBytes(24).toString('hex');
+    await this.prisma.$transaction([
+      this.prisma.emailVerificationToken.deleteMany({ where: { userId: user.id, usedAt: null } }),
+      this.prisma.emailVerificationToken.create({
+        data: { id: randomUUID(), userId: user.id, tokenHash: this.hashToken(token), expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS) },
+      }),
+    ]);
+    await this.mail.sendEmailVerification(user.email, user.username, this.frontendLink('/verify-email', token));
+  }
+
+  private frontendLink(path: string, token: string) {
+    const base = this.config.getOrThrow<string>('FRONTEND_URL').replace(/\/$/, '');
+    return `${base}${path}?token=${token}`;
   }
 
   private findUserByEmail(email: string) {
@@ -440,6 +517,7 @@ export class AuthService {
       username: user.username,
       email: user.email,
       role: user.role,
+      emailVerified: Boolean(user.emailVerifiedAt),
       createdAt: user.createdAt,
     };
   }

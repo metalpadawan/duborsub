@@ -61,3 +61,18 @@ export class RefreshSessionDto {
   @IsString()
   refreshToken?: string;
 }
+
+export class VerifyEmailDto {
+  @SanitizePlainText()
+  @IsString()
+  @MinLength(32)
+  @MaxLength(128)
+  token: string;
+}
+
+export class DeleteAccountDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(72)
+  password: string;
+}

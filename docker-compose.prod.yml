@@ -1,0 +1,85 @@
+# AniRate in production on one server: PostgreSQL, the API, the website, and Caddy in
+# front with automatic HTTPS. See docs/deploy.md.
+#
+#   cp .env.production.example .env.production   # then fill it in
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: anirate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: anime_platform
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U anirate -d anime_platform']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    # No published port: only the API reaches the database.
+
+  backend:
+    build: ./apps/anirate-base/backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://anirate:${POSTGRES_PASSWORD}@postgres:5432/anime_platform?schema=public
+      FRONTEND_URL: https://${SITE_DOMAIN:?set SITE_DOMAIN in .env.production}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env.production}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env.production}
+      TRUST_PROXY: 'true'
+      COOKIE_SECURE: 'true'
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+
+  frontend:
+    build:
+      context: ./apps/anirate-base/frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_DOMAIN:?set API_DOMAIN in .env.production}/api/v1
+        NEXT_PUBLIC_SITE_URL: https://${SITE_DOMAIN}
+        NEXT_PUBLIC_CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # Server-side rendering talks to the API over the private network.
+      API_URL: http://backend:4000/api/v1
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    volumes:
+      - image-cache:/app/.next/cache
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+  image-cache:
+  caddy-data:
+  caddy-config:

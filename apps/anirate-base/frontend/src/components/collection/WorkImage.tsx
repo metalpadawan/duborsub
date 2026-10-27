@@ -1,4 +1,19 @@
 // The cover when the record has one; otherwise a typeset plate, never a broken image.
+import { getImageProps } from 'next/image';
+import { version as reactVersion } from 'react';
+import imageHosts from '@/lib/image-hosts.json';
+
+const OPTIMIZED_HOSTS = new Set<string>(imageHosts);
+const PRIORITY_PROP = Number(reactVersion.split('.')[0]) >= 19 ? 'fetchPriority' : 'fetchpriority';
+
+function isOptimizable(src: string) {
+  try {
+    return OPTIMIZED_HOSTS.has(new URL(src).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function WorkImage({
   title,
   src,
@@ -15,18 +30,36 @@ export function WorkImage({
   titled?: boolean;
 }) {
   if (src) {
-    return (
-      // A plain <img>: the catalog renders without JS, so there is no next/image loader.
-      <img
-        src={src}
-        alt={decorative ? '' : `Cover art for ${title}`}
-        loading={priority ? 'eager' : 'lazy'}
-        decoding="async"
-        fetchPriority={priority ? 'high' : 'auto'}
-        width={460}
-        height={690}
-      />
-    );
+    const alt = decorative ? '' : `Cover art for ${title}`;
+    // The zero-JS catalogue renders with React 18, which only knows the lower-case
+    // attribute; the App Router pages run React 19, which wants the camel-cased prop.
+    const priorityAttribute = { [PRIORITY_PROP]: priority ? 'high' : 'auto' } as Record<string, string>;
+
+    if (!isOptimizable(src)) {
+      // A cover on a host the image optimizer does not fetch from (an admin's URL).
+      return <img src={src} alt={alt} loading={priority ? 'eager' : 'lazy'} decoding="async" width={460} height={690} {...priorityAttribute} />;
+    }
+
+    // Covers go through Next's image optimizer: a list thumbnail downloads a small
+    // WebP/AVIF instead of the source's full-size JPEG. getImageProps only computes
+    // attributes, so this stays a plain <img> that works on the zero-JS pages.
+    const { props } = getImageProps({
+      src,
+      alt,
+      width: 460,
+      height: 690,
+      quality: 75,
+      loading: priority ? 'eager' : 'lazy',
+      sizes: titled ? '(max-width: 760px) 92vw, 460px' : '56px',
+    });
+    // Next's own fetchPriority and inline style are replaced by the attribute above.
+    const attributes: Record<string, unknown> = { ...props };
+    delete attributes.fetchPriority;
+    delete attributes.style;
+
+    // data-original lets the fallback script (lib/image-fallback.ts) load the source
+    // image directly if the resized one fails.
+    return <img {...attributes} alt={alt} decoding="async" data-original={src} {...priorityAttribute} />;
   }
 
   const a11y = decorative ? {} : { role: 'img' as const, 'aria-label': `${title}, no cover on record` };

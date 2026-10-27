@@ -12,6 +12,7 @@ import {
 import { ParseResourceIdPipe } from '../common/pipes/parse-resource-id.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 import { MyRatingsQueryDto, UpsertRatingDto } from './dto/ratings.dto';
 import { RatingsService } from './ratings.service';
 
@@ -20,7 +21,7 @@ export class RatingsController {
   constructor(private readonly ratingsService: RatingsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, VerifiedEmailGuard)
   upsert(
     @Param('animeId', ParseResourceIdPipe) animeId: string,
     @CurrentUser() user: { id: string },

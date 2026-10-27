@@ -4,12 +4,17 @@
 // lets the browser run its cross-document view transition.
 import type { ReactNode } from 'react';
 
+export type MenuLink = { href: string; label: string };
+
 export function Masthead({
   current,
   auth,
+  menuLinks = [],
 }: {
   current?: 'collection' | 'rankings';
   auth: ReactNode;
+  /** Extra destinations for the phone menu, such as My ratings for a signed-in viewer. */
+  menuLinks?: MenuLink[];
 }) {
   return (
     <header className="masthead">
@@ -31,6 +36,26 @@ export function Masthead({
             Rankings
           </a>
           {auth}
+          {/* A native disclosure, so the phone menu opens on the zero-JS pages too. */}
+          <details className="menu show-sm">
+            <summary className="menu__toggle">Menu</summary>
+            <ul className="menu__panel">
+              <li>
+                <a href="/">Collection</a>
+              </li>
+              <li>
+                <a href="/catalog/search?sort=rating">Rankings</a>
+              </li>
+              <li>
+                <a href="/request">Request a title</a>
+              </li>
+              {menuLinks.map((link) => (
+                <li key={link.href}>
+                  <a href={link.href}>{link.label}</a>
+                </li>
+              ))}
+            </ul>
+          </details>
         </nav>
       </div>
     </header>

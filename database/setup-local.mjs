@@ -44,7 +44,30 @@ if (!existsSync(backendEnv)) {
 let backendText = readEnv(backendEnv);
 backendText = setVar(backendText, 'DATABASE_URL', `postgresql://${DB_USER}:${password}@localhost:5432/anime_platform?schema=public`);
 backendText = setVar(backendText, 'DATABASE_URL_TEST', `postgresql://${DB_USER}:${password}@localhost:5432/anime_platform_test?schema=public`);
+
+// A JWT secret that is missing or still the example's placeholder is replaced.
+const jwtSecret = /^JWT_SECRET="?([^"\r\n]*)"?$/m.exec(backendText)?.[1] ?? '';
+if (jwtSecret.length < 32 || jwtSecret.includes('CHANGE_ME')) {
+  backendText = setVar(backendText, 'JWT_SECRET', randomBytes(48).toString('hex'));
+  console.log('Generated a JWT_SECRET in apps/anirate-base/backend/.env');
+}
+
+// 2b. The key that exempts the website's own page renders from the API's rate limit,
+// written to both apps.
+const frontendEnv = resolve(root, 'apps/anirate-base/frontend/.env.local');
+let frontendText = readEnv(frontendEnv);
+let internalKey = /^INTERNAL_API_KEY="?([^"\r\n]+)"?$/m.exec(backendText)?.[1];
+if (!internalKey) {
+  internalKey = randomBytes(32).toString('hex');
+  console.log('Generated an INTERNAL_API_KEY for the backend and frontend .env files');
+}
+backendText = setVar(backendText, 'INTERNAL_API_KEY', internalKey);
 writeFileSync(backendEnv, backendText);
+if (!/^NEXT_PUBLIC_API_URL=/m.test(frontendText)) {
+  frontendText = setVar(frontendText, 'NEXT_PUBLIC_API_URL', 'http://localhost:4000/api/v1');
+}
+frontendText = setVar(frontendText, 'INTERNAL_API_KEY', internalKey);
+writeFileSync(frontendEnv, frontendText);
 
 // 3. Start the database, then set the password on it. POSTGRES_PASSWORD only applies
 // when the data volume is first created, so an existing database is updated here.

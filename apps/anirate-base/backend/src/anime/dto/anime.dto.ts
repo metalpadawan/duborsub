@@ -59,6 +59,25 @@ export class CreateAnimeDto {
   @IsNumber({}, { each: true })
   @Min(1, { each: true })
   genreIds?: number[];
+
+  // Other names (romaji, Japanese, translations), searchable like the title.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(150)
+  @IsString({ each: true })
+  @MaxLength(255, { each: true })
+  alternativeTitles?: string[];
+
+  @IsOptional()
+  @IsIn(['TV', 'MOVIE', 'OVA', 'ONA', 'SPECIAL'])
+  format?: 'TV' | 'MOVIE' | 'OVA' | 'ONA' | 'SPECIAL';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  episodes?: number;
 }
 
 export class UpdateAnimeDto {
@@ -103,6 +122,25 @@ export class UpdateAnimeDto {
   @IsNumber({}, { each: true })
   @Min(1, { each: true })
   genreIds?: number[];
+
+  // Other names (romaji, Japanese, translations), searchable like the title.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(150)
+  @IsString({ each: true })
+  @MaxLength(255, { each: true })
+  alternativeTitles?: string[];
+
+  @IsOptional()
+  @IsIn(['TV', 'MOVIE', 'OVA', 'ONA', 'SPECIAL'])
+  format?: 'TV' | 'MOVIE' | 'OVA' | 'ONA' | 'SPECIAL';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  episodes?: number;
 }
 
 export class AnimeQueryDto {
@@ -153,4 +191,19 @@ export class AnimeQueryDto {
   @Min(1)
   @Max(50)
   limit = 20;
+}
+
+export class SitemapQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  size = 10000;
 }

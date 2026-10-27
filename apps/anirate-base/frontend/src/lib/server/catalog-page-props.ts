@@ -7,6 +7,23 @@ import {
   loadFeaturedCandidates,
   loadGenres,
 } from '@/lib/server/catalog-source';
+import { resolveServerApiUrl } from '@/lib/server/api-base';
+
+// Thrown when the API is configured but did not answer. A statically generated page
+// keeps serving its last good copy; a search page shows the error page. Demo titles
+// are never passed off as the real catalogue.
+export class CatalogUnavailableError extends Error {
+  constructor() {
+    super('The catalogue API did not answer');
+  }
+}
+
+// The bundled demo catalogue stands in only when no API is configured at all, or
+// while building without a backend running (CI), where the page is regenerated with
+// real data on its first request.
+function mayUseDemoCatalogue() {
+  return !resolveServerApiUrl() || process.env.NEXT_PHASE === 'phase-production-build';
+}
 
 export async function loadCatalogPageProps({
   search = '',
@@ -37,6 +54,9 @@ export async function loadCatalogPageProps({
     : null;
 
   if (!genres || !catalogPage) {
+    if (!mayUseDemoCatalogue()) {
+      throw new CatalogUnavailableError();
+    }
     return fallbackProps({ search: normalizedSearch, sort: normalizedSort, genre, page: requestedPage });
   }
 
@@ -50,6 +70,7 @@ export async function loadCatalogPageProps({
     page: catalogPage.page,
     totalItems: catalogPage.total,
     totalPages: catalogPage.pages,
+    isDemo: false,
   };
 }
 
@@ -108,5 +129,6 @@ function fallbackProps({ search, sort, genre, page }: { search: string; sort: So
     page: normalizedPage,
     totalItems: filteredItems.length,
     totalPages,
+    isDemo: true,
   };
 }

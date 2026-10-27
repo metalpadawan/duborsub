@@ -13,6 +13,7 @@ import { WorkImage } from '@/components/collection/WorkImage';
 import type { Anime } from '@/lib/api';
 import { defaultSortFor, PAGE_SIZE, sortLabels, type HomeProps, type SortKey, type ZeroJsPageConfig } from '@/lib/catalog-view';
 import { isSampleRecord } from '@/lib/provenance';
+import { SHARE_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 import { describeSplit, formatCount, formatLabel, formatStatus, plural, workTransitionName } from '@/lib/scores';
 
 export const config: ZeroJsPageConfig = {
@@ -23,9 +24,10 @@ export const getStaticProps: GetStaticProps<HomeProps> = async () => {
   const { loadCatalogPageProps } = await import('@/lib/server/catalog-page-props');
   const props = await loadCatalogPageProps({});
 
+  // A page built from the demo catalogue (no backend at build time) is replaced on its first request.
   return {
     props,
-    revalidate: 60,
+    revalidate: props.isDemo ? 1 : 60,
   };
 };
 
@@ -37,6 +39,7 @@ export default function HomePage({ search, sort, genre, genres, items, featured,
   const endItem = Math.min(page * PAGE_SIZE, totalItems);
   const filtered = Boolean(search || genre);
   const rankings = sort === 'rating' && !filtered;
+  const canonicalUrl = rankings ? `${SITE_URL}/catalog/search?sort=rating` : page > 1 ? `${SITE_URL}/catalog/${page}` : `${SITE_URL}/`;
   const pageTitle = search
     ? `“${search}” in the collection · AniRate`
     : rankings
@@ -49,11 +52,17 @@ export default function HomePage({ search, sort, genre, genres, items, featured,
     <>
       <Head>
         <title>{pageTitle}</title>
-        <meta
-          name="description"
-          content="AniRate rates the subtitled and dubbed release of every anime separately, so you can choose the version worth watching."
-        />
+        <meta name="description" content={SITE_DESCRIPTION} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Search results are endless variations of the catalogue: crawl them, don't index them. */}
+        {search || genre ? <meta name="robots" content="noindex, follow" /> : <link rel="canonical" href={canonicalUrl} />}
+        <meta property="og:site_name" content={SITE_NAME} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={SITE_DESCRIPTION} />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:image" content={SHARE_IMAGE} />
+        <meta name="twitter:card" content="summary_large_image" />
       </Head>
 
       <a className="skip-link" href="#collection">
@@ -72,7 +81,7 @@ export default function HomePage({ search, sort, genre, genres, items, featured,
                 Two scores.
               </h1>
               <p className="lede">
-                AniRate rates the subtitled and the dubbed release of every anime separately, so you can choose the version worth your evening.
+                If you are a true otaku you&rsquo;d know it&rsquo;s sub all the way, but there are anime with dubs so good they transcend lifetimes. DuborSub gives otakus the community to share their experience with others and help the community improve their viewing experience.
               </p>
               <SearchForm search={search} sort={sort} genre={genre} />
             </div>
@@ -160,13 +169,34 @@ export default function HomePage({ search, sort, genre, genres, items, featured,
             </div>
           ) : (
             <div className="empty">
-              <p className="title-m">Nothing in the collection matches that.</p>
-              <p className="muted">Try a shorter title, or clear the filters to see every work.</p>
-              <a className="btn btn--line btn--sm" href="/">
-                Clear filters
-              </a>
+              <p className="title-m">{search ? `Nothing in the collection matches “${search}”.` : 'Nothing in the collection matches that.'}</p>
+              <p className="muted">
+                {search
+                  ? 'Try a shorter title or another name for it. If it really is missing, request it and it will be added.'
+                  : 'Clear the filters to see every work.'}
+              </p>
+              <p className="empty__actions">
+                {search ? (
+                  <a className="btn btn--ink btn--sm" href={`/request?title=${encodeURIComponent(search)}`}>
+                    Request this title
+                  </a>
+                ) : null}
+                <a className="btn btn--line btn--sm" href="/">
+                  Clear filters
+                </a>
+              </p>
             </div>
           )}
+
+          {search && items.length > 0 ? (
+            <p className="collection__request">
+              Can&rsquo;t find it?{' '}
+              <a className="link link--ruled" href={`/request?title=${encodeURIComponent(search)}`}>
+                Request a title
+              </a>{' '}
+              and it will be added.
+            </p>
+          ) : null}
 
           {totalPages > 1 ? (
             <nav className="pager" aria-label="Collection pages">

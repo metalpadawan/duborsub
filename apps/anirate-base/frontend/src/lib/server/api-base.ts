@@ -9,3 +9,12 @@ export function resolveServerApiUrl() {
 
   return process.env.NODE_ENV === 'production' ? null : 'http://localhost:4000/api/v1';
 }
+
+// The site's own server makes the API requests for every visitor's page, so to the
+// API it is one very busy client. This shared key (INTERNAL_API_KEY, the same on
+// both servers, never sent to browsers) exempts those requests from the per-client
+// rate limit, which would otherwise throttle the whole site.
+export function internalApiHeaders(): Record<string, string> {
+  const key = process.env.INTERNAL_API_KEY?.trim();
+  return key ? { 'X-Internal-Key': key } : {};
+}

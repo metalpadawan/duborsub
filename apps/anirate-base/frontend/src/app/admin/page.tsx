@@ -8,14 +8,16 @@ import { Providers } from '@/app/providers';
 import { errorMessage } from '@/components/AuthLayout';
 import { Colophon } from '@/components/collection/Colophon';
 import { SiteHeader } from '@/components/SiteHeader';
-import { adminApi, animeApi, type AdminUser, type AnimeDetail } from '@/lib/api';
+import { adminApi, animeApi, type AdminComment, type AdminTitleRequest, type AdminUser, type AnimeDetail } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth.store';
 import { formatCount, formatLabel, plural } from '@/lib/scores';
 
-type Tab = 'dub' | 'titles' | 'members' | 'activity';
+type Tab = 'requests' | 'dub' | 'notes' | 'titles' | 'members' | 'activity';
 
 const TABS: Array<{ key: Tab; label: string }> = [
+  { key: 'requests', label: 'Requests' },
   { key: 'dub', label: 'Dub reports' },
+  { key: 'notes', label: 'Notes' },
   { key: 'titles', label: 'Titles' },
   { key: 'members', label: 'Members' },
   { key: 'activity', label: 'Activity' },
@@ -33,7 +35,7 @@ export default function AdminPage() {
 
 function Admin() {
   const { user, isLoading } = useAuthStore();
-  const [tab, setTab] = useState<Tab>('dub');
+  const [tab, setTab] = useState<Tab>('requests');
 
   if (isLoading) {
     return (
@@ -86,7 +88,9 @@ function Admin() {
             </button>
           ))}
         </nav>
+        {tab === 'requests' ? <Requests /> : null}
         {tab === 'dub' ? <DubQueue /> : null}
+        {tab === 'notes' ? <Notes /> : null}
         {tab === 'titles' ? <Titles /> : null}
         {tab === 'members' ? <Members selfId={user.id} /> : null}
         {tab === 'activity' ? <Activity /> : null}
@@ -104,7 +108,9 @@ function Overview() {
     ['Members', counts?.totalUsers],
     ['Ratings', counts?.totalRatings],
     ['Notes', counts?.totalComments],
+    ['Titles requested', counts?.pendingTitleRequests],
     ['Titles with dub reports', counts?.pendingDubReports],
+    ['Notes reported', counts?.reportedComments],
   ];
 
   return (
@@ -263,7 +269,8 @@ function TitleEditor({ animeId, onDone }: { animeId: string; onDone: () => void 
 
   return (
     <TitleForm
-      anime={detail.data}
+      initial={valuesFrom(detail.data)}
+      animeId={animeId}
       onSaved={() => {
         queryClient.invalidateQueries({ queryKey: ['admin'] });
         queryClient.invalidateQueries({ queryKey: ['anime', animeId] });
@@ -273,36 +280,89 @@ function TitleEditor({ animeId, onDone }: { animeId: string; onDone: () => void 
   );
 }
 
-function TitleForm({ anime, onSaved }: { anime: AnimeDetail; onSaved: () => void }) {
-  const [title, setTitle] = useState(anime.title);
-  const [description, setDescription] = useState(anime.description ?? '');
-  const [coverImageUrl, setCoverImageUrl] = useState(anime.coverImageUrl ?? '');
-  const [releaseYear, setReleaseYear] = useState(anime.releaseYear ? String(anime.releaseYear) : '');
-  const [status, setStatus] = useState(anime.status);
-  const [hasDub, setHasDub] = useState(anime.hasDub);
+type TitleValues = {
+  title: string;
+  alternativeTitles: string;
+  format: string;
+  episodes: string;
+  releaseYear: string;
+  status: string;
+  hasDub: boolean;
+  coverImageUrl: string;
+  description: string;
+};
+
+const EMPTY_TITLE: TitleValues = {
+  title: '',
+  alternativeTitles: '',
+  format: 'TV',
+  episodes: '',
+  releaseYear: '',
+  status: 'completed',
+  hasDub: false,
+  coverImageUrl: '',
+  description: '',
+};
+
+function valuesFrom(anime: AnimeDetail): TitleValues {
+  return {
+    title: anime.title,
+    alternativeTitles: (anime.alternativeTitles ?? []).join('\n'),
+    format: anime.format ?? '',
+    episodes: anime.episodes ? String(anime.episodes) : '',
+    releaseYear: anime.releaseYear ? String(anime.releaseYear) : '',
+    status: anime.status,
+    hasDub: anime.hasDub,
+    coverImageUrl: anime.coverImageUrl ?? '',
+    description: anime.description ?? '',
+  };
+}
+
+// One form for keying in a new title and for editing an existing one.
+function TitleForm({
+  initial,
+  animeId,
+  onSaved,
+  submitLabel = 'Save changes',
+}: {
+  initial: TitleValues;
+  animeId?: string;
+  onSaved: (animeId: string) => void;
+  submitLabel?: string;
+}) {
+  const [values, setValues] = useState(initial);
   const [error, setError] = useState('');
+  const set = <K extends keyof TitleValues>(key: K, value: TitleValues[K]) => setValues((current) => ({ ...current, [key]: value }));
 
   const save = useMutation({
-    mutationFn: () =>
-      animeApi.update(anime.id, {
-        title: title.trim(),
-        ...(description.trim() ? { description: description.trim() } : {}),
-        ...(coverImageUrl.trim() ? { coverImageUrl: coverImageUrl.trim() } : {}),
-        ...(releaseYear ? { releaseYear: Number(releaseYear) } : {}),
-        status,
-        hasDub,
-      }),
-    onSuccess: onSaved,
-    onError: (err) => setError(errorMessage(err, 'The changes did not save.')),
+    mutationFn: async () => {
+      const payload = {
+        title: values.title.trim(),
+        alternativeTitles: values.alternativeTitles
+          .split('\n')
+          .map((name) => name.trim())
+          .filter(Boolean),
+        ...(values.format ? { format: values.format } : {}),
+        ...(values.episodes ? { episodes: Number(values.episodes) } : {}),
+        ...(values.description.trim() ? { description: values.description.trim() } : {}),
+        ...(values.coverImageUrl.trim() ? { coverImageUrl: values.coverImageUrl.trim() } : {}),
+        ...(values.releaseYear ? { releaseYear: Number(values.releaseYear) } : {}),
+        status: values.status,
+        hasDub: values.hasDub,
+      };
+      return animeId ? (await animeApi.update(animeId, payload)).data : (await animeApi.create(payload)).data;
+    },
+    onSuccess: (anime) => onSaved(anime.id),
+    onError: (err) => setError(errorMessage(err, 'The title did not save.')),
   });
 
   const remove = useMutation({
-    mutationFn: () => animeApi.delete(anime.id),
-    onSuccess: onSaved,
+    mutationFn: () => animeApi.delete(animeId as string),
+    onSuccess: () => onSaved(animeId as string),
     onError: (err) => setError(errorMessage(err, 'The title was not deleted.')),
   });
 
-  const id = (name: string) => `edit-${anime.id}-${name}`;
+  const id = (name: string) => `title-${animeId ?? 'new'}-${name}`;
 
   return (
     <form
@@ -322,13 +382,49 @@ function TitleForm({ anime, onSaved }: { anime: AnimeDetail; onSaved: () => void
         <label className="field__label signage" htmlFor={id('title')}>
           Title
         </label>
-        <input id={id('title')} className="input" value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={255} />
+        <input id={id('title')} className="input" value={values.title} onChange={(event) => set('title', event.target.value)} required maxLength={255} />
+      </div>
+      <div className="field">
+        <label className="field__label signage" htmlFor={id('names')}>
+          Other names, one per line (searchable)
+        </label>
+        <textarea
+          id={id('names')}
+          className="input admin__textarea admin__textarea--short"
+          value={values.alternativeTitles}
+          onChange={(event) => set('alternativeTitles', event.target.value)}
+          placeholder={'Romaji title\nJapanese title'}
+        />
       </div>
       <label className="admin__check">
-        <input type="checkbox" checked={hasDub} onChange={(event) => setHasDub(event.target.checked)} />
+        <input type="checkbox" checked={values.hasDub} onChange={(event) => set('hasDub', event.target.checked)} />
         <span>Has an English dub</span>
       </label>
       <div className="admin__form-row">
+        <div className="field">
+          <label className="field__label signage" htmlFor={id('format')}>
+            Format
+          </label>
+          <select id={id('format')} className="input" value={values.format} onChange={(event) => set('format', event.target.value)}>
+            <option value="TV">TV</option>
+            <option value="MOVIE">Movie</option>
+            <option value="OVA">OVA</option>
+            <option value="ONA">Web series</option>
+            <option value="SPECIAL">Special</option>
+          </select>
+        </div>
+        <div className="field">
+          <label className="field__label signage" htmlFor={id('episodes')}>
+            Episodes
+          </label>
+          <input
+            id={id('episodes')}
+            className="input"
+            inputMode="numeric"
+            value={values.episodes}
+            onChange={(event) => set('episodes', event.target.value.replace(/\D/g, '').slice(0, 5))}
+          />
+        </div>
         <div className="field">
           <label className="field__label signage" htmlFor={id('year')}>
             Release year
@@ -337,15 +433,15 @@ function TitleForm({ anime, onSaved }: { anime: AnimeDetail; onSaved: () => void
             id={id('year')}
             className="input"
             inputMode="numeric"
-            value={releaseYear}
-            onChange={(event) => setReleaseYear(event.target.value.replace(/\D/g, '').slice(0, 4))}
+            value={values.releaseYear}
+            onChange={(event) => set('releaseYear', event.target.value.replace(/\D/g, '').slice(0, 4))}
           />
         </div>
         <div className="field">
           <label className="field__label signage" htmlFor={id('status')}>
             Status
           </label>
-          <select id={id('status')} className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <select id={id('status')} className="input" value={values.status} onChange={(event) => set('status', event.target.value)}>
             <option value="airing">Airing</option>
             <option value="completed">Completed</option>
             <option value="upcoming">Upcoming</option>
@@ -356,7 +452,7 @@ function TitleForm({ anime, onSaved }: { anime: AnimeDetail; onSaved: () => void
         <label className="field__label signage" htmlFor={id('cover')}>
           Cover image URL (HTTPS)
         </label>
-        <input id={id('cover')} className="input" type="url" value={coverImageUrl} onChange={(event) => setCoverImageUrl(event.target.value)} />
+        <input id={id('cover')} className="input" type="url" value={values.coverImageUrl} onChange={(event) => set('coverImageUrl', event.target.value)} />
       </div>
       <div className="field">
         <label className="field__label signage" htmlFor={id('synopsis')}>
@@ -365,29 +461,235 @@ function TitleForm({ anime, onSaved }: { anime: AnimeDetail; onSaved: () => void
         <textarea
           id={id('synopsis')}
           className="input admin__textarea"
-          value={description}
+          value={values.description}
           maxLength={4000}
-          onChange={(event) => setDescription(event.target.value)}
+          onChange={(event) => set('description', event.target.value)}
         />
       </div>
       <div className="admin__actions admin__actions--split">
-        <button type="submit" className="btn btn--ink btn--sm" disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save changes'}
+        <button type="submit" className="btn btn--ink btn--sm" disabled={save.isPending || !values.title.trim()}>
+          {save.isPending ? 'Saving…' : submitLabel}
         </button>
-        <button
-          type="button"
-          className="text-action"
-          disabled={remove.isPending}
-          onClick={() => {
-            if (window.confirm(`Delete “${anime.title}” with all its ratings and notes? This cannot be undone.`)) {
-              remove.mutate();
-            }
-          }}
-        >
-          Delete title
-        </button>
+        {animeId ? (
+          <button
+            type="button"
+            className="text-action"
+            disabled={remove.isPending}
+            onClick={() => {
+              if (window.confirm(`Delete “${values.title}” with all its ratings and notes? This cannot be undone.`)) {
+                remove.mutate();
+              }
+            }}
+          >
+            Delete title
+          </button>
+        ) : null}
       </div>
     </form>
+  );
+}
+
+// Titles visitors could not find, most requested first. Adding one keys it into the
+// catalogue from the request; rejecting can carry a short note.
+function Requests() {
+  const queryClient = useQueryClient();
+  const [status, setStatus] = useState<'pending' | 'added' | 'rejected'>('pending');
+  const [page, setPage] = useState(1);
+  const [adding, setAdding] = useState<string | null>(null);
+  const requests = useQuery({
+    queryKey: ['admin', 'requests', status, page],
+    queryFn: async () => (await adminApi.titleRequests(status, page)).data,
+  });
+
+  const resolve = useMutation({
+    mutationFn: (input: { id: string; status: 'added' | 'rejected'; animeId?: string; note?: string }) =>
+      adminApi.resolveTitleRequest(input.id, { status: input.status, animeId: input.animeId, note: input.note }),
+    onSuccess: () => {
+      setAdding(null);
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
+    },
+  });
+
+  return (
+    <section className="admin__section" aria-labelledby="requests-title">
+      <h2 id="requests-title" className="title-m">
+        Requested titles
+      </h2>
+      <p className="muted admin__lede">
+        Anime people searched for and could not find. Check the catalogue first; if it is really missing, add it here and the request is
+        marked done.
+      </p>
+      <nav className="tabs" aria-label="Request status">
+        {(['pending', 'added', 'rejected'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            className="tab"
+            aria-current={status === value ? 'true' : undefined}
+            onClick={() => {
+              setStatus(value);
+              setPage(1);
+            }}
+          >
+            {value === 'pending' ? 'Waiting' : value === 'added' ? 'Added' : 'Rejected'}
+          </button>
+        ))}
+      </nav>
+      {requests.isLoading ? <p className="muted">Loading…</p> : null}
+      {requests.data && requests.data.items.length === 0 ? <p className="admin__empty muted">Nothing here.</p> : null}
+      {requests.data?.items.length ? (
+        <ul className="admin__list">
+          {requests.data.items.map((request) => (
+            <li key={request.id} className="admin__row admin__row--stack">
+              <RequestRow
+                request={request}
+                adding={adding === request.id}
+                busy={resolve.isPending}
+                onAdd={() => setAdding(adding === request.id ? null : request.id)}
+                onReject={() => {
+                  const note = window.prompt(`Why is “${request.title}” not being added? (optional)`);
+                  if (note !== null) resolve.mutate({ id: request.id, status: 'rejected', note: note.trim() || undefined });
+                }}
+              />
+              {adding === request.id ? (
+                <TitleForm
+                  initial={{ ...EMPTY_TITLE, title: request.title, description: '' }}
+                  submitLabel="Add to the catalogue"
+                  onSaved={(animeId) => resolve.mutate({ id: request.id, status: 'added', animeId })}
+                />
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {requests.data && requests.data.pagination.pages > 1 ? (
+        <Pager page={page} pages={requests.data.pagination.pages} onPage={setPage} />
+      ) : null}
+    </section>
+  );
+}
+
+function RequestRow({
+  request,
+  adding,
+  busy,
+  onAdd,
+  onReject,
+}: {
+  request: AdminTitleRequest;
+  adding: boolean;
+  busy: boolean;
+  onAdd: () => void;
+  onReject: () => void;
+}) {
+  const meta = [
+    request.requestCount > 1 ? `Asked for ${request.requestCount} times` : 'Asked for once',
+    request.user ? `by ${request.user.username}` : 'without an account',
+    dateFormat.format(new Date(request.createdAt)),
+  ].join(' · ');
+
+  return (
+    <div className="admin__row-head">
+      <div>
+        <span className="admin__name">{request.title}</span>
+        <p className="muted admin__meta">{meta}</p>
+        {request.details ? <p className="admin__detail">{request.details}</p> : null}
+        {request.link ? (
+          <p className="admin__detail">
+            <a className="link link--ruled" href={request.link} target="_blank" rel="noopener noreferrer nofollow">
+              {request.link}
+            </a>
+          </p>
+        ) : null}
+        {request.adminNote ? <p className="admin__detail muted">Note: {request.adminNote}</p> : null}
+        {request.animeId ? (
+          <p className="admin__detail">
+            <a className="link link--ruled" href={`/anime/${request.animeId}`}>
+              View the added title
+            </a>
+          </p>
+        ) : null}
+      </div>
+      {request.status === 'pending' ? (
+        <div className="admin__actions">
+          <a className="btn btn--line btn--sm" href={`/catalog/search?q=${encodeURIComponent(request.title)}`} target="_blank" rel="noreferrer">
+            Check the catalogue
+          </a>
+          <button type="button" className="btn btn--ink btn--sm" aria-expanded={adding} onClick={onAdd} disabled={busy}>
+            {adding ? 'Close' : 'Add to catalogue'}
+          </button>
+          <button type="button" className="text-action" onClick={onReject} disabled={busy}>
+            Reject
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// Reported notes first, then the latest notes, each removable by a moderator.
+function Notes() {
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const reports = useQuery({ queryKey: ['admin', 'comment-reports'], queryFn: async () => (await adminApi.commentReports()).data });
+  const recent = useQuery({ queryKey: ['admin', 'comments', page], queryFn: async () => (await adminApi.recentComments(page)).data });
+
+  const act = useMutation({
+    mutationFn: ({ commentId, remove }: { commentId: string; remove: boolean }) =>
+      remove ? adminApi.removeComment(commentId) : adminApi.dismissCommentReports(commentId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
+  });
+
+  const row = (comment: AdminComment, reasons?: string[]) => (
+    <li key={comment.id} className="admin__row">
+      <div>
+        <p className="admin__detail">{comment.isDeleted ? <span className="muted">(removed)</span> : comment.content}</p>
+        <p className="muted admin__meta">
+          {[
+            comment.user?.username ?? 'Former member',
+            comment.anime.title,
+            dateFormat.format(new Date(comment.createdAt)),
+            comment.reports ? plural(comment.reports, 'report') : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+        {reasons?.length ? <p className="admin__detail muted">Reasons: {reasons.join('; ')}</p> : null}
+      </div>
+      {!comment.isDeleted ? (
+        <div className="admin__actions">
+          <button
+            type="button"
+            className="btn btn--line btn--sm"
+            disabled={act.isPending}
+            onClick={() => window.confirm('Remove this note? Its author sees it marked as removed by a moderator.') && act.mutate({ commentId: comment.id, remove: true })}
+          >
+            Remove
+          </button>
+          {reasons ? (
+            <button type="button" className="text-action" disabled={act.isPending} onClick={() => act.mutate({ commentId: comment.id, remove: false })}>
+              Dismiss reports
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
+
+  return (
+    <section className="admin__section" aria-labelledby="notes-admin-title">
+      <h2 id="notes-admin-title" className="title-m">
+        Reported notes
+      </h2>
+      {reports.data?.items.length ? (
+        <ul className="admin__list">{reports.data.items.map((comment) => row(comment, comment.reasons))}</ul>
+      ) : (
+        <p className="admin__empty muted">No reported notes.</p>
+      )}
+      <h2 className="title-m">Latest notes</h2>
+      {recent.data?.items.length ? <ul className="admin__list">{recent.data.items.map((comment) => row(comment))}</ul> : <p className="admin__empty muted">No notes yet.</p>}
+      {recent.data && recent.data.pagination.pages > 1 ? <Pager page={page} pages={recent.data.pagination.pages} onPage={setPage} /> : null}
+    </section>
   );
 }
 

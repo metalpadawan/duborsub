@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { buildSearchText, searchKey, sortTitleOf } from '../common/search/search-key';
-import { AnimeQueryDto, CreateAnimeDto, UpdateAnimeDto } from './dto/anime.dto';
+import { AnimeQueryDto, CreateAnimeDto, SitemapQueryDto, UpdateAnimeDto } from './dto/anime.dto';
 
 const LIST_SELECT = {
   id: true,
@@ -102,14 +102,28 @@ export class AnimeService {
     return { items: await this.prisma.genre.findMany({ orderBy: { name: 'asc' } }) };
   }
 
+  /** Every title's id and last change, a chunk at a time, for the sitemap. */
+  async sitemap(query: SitemapQueryDto) {
+    const { page = 1, size = 10000 } = query;
+    const [total, items] = await Promise.all([
+      this.prisma.anime.count(),
+      this.prisma.anime.findMany({ orderBy: { id: 'asc' }, skip: (page - 1) * size, take: size, select: { id: true, updatedAt: true } }),
+    ]);
+    return { items, total };
+  }
+
   async create(dto: CreateAnimeDto) {
     const genreIds = await this.checkGenres(dto.genreIds);
+    const alternativeTitles = cleanNames(dto.title, dto.alternativeTitles);
     const anime = await this.prisma.anime.create({
       data: {
         id: randomUUID(),
         title: dto.title,
         sortTitle: sortTitleOf(dto.title),
-        searchText: buildSearchText(dto.title, []),
+        searchText: buildSearchText(dto.title, alternativeTitles),
+        alternativeTitles,
+        format: dto.format ?? null,
+        episodes: dto.episodes ?? null,
         description: dto.description ?? '',
         coverImageUrl: dto.coverImageUrl ?? null,
         releaseYear: dto.releaseYear ?? null,
@@ -131,13 +145,19 @@ export class AnimeService {
     }
 
     const genreIds = dto.genreIds === undefined ? undefined : await this.checkGenres(dto.genreIds);
+    const current = await this.prisma.anime.findUniqueOrThrow({ where: { id }, select: { title: true } });
+    const title = dto.title ?? current.title;
+    const alternativeTitles = dto.alternativeTitles === undefined ? existing.alternativeTitles : cleanNames(title, dto.alternativeTitles);
+    const namesChanged = dto.title !== undefined || dto.alternativeTitles !== undefined;
     await this.prisma.$transaction(async (tx) => {
       await tx.anime.update({
         where: { id },
         data: {
-          ...(dto.title !== undefined
-            ? { title: dto.title, sortTitle: sortTitleOf(dto.title), searchText: buildSearchText(dto.title, existing.alternativeTitles) }
+          ...(namesChanged
+            ? { title, alternativeTitles, sortTitle: sortTitleOf(title), searchText: buildSearchText(title, alternativeTitles) }
             : {}),
+          ...(dto.format !== undefined ? { format: dto.format } : {}),
+          ...(dto.episodes !== undefined ? { episodes: dto.episodes } : {}),
           ...(dto.description !== undefined ? { description: dto.description } : {}),
           ...(dto.coverImageUrl !== undefined ? { coverImageUrl: dto.coverImageUrl } : {}),
           ...(dto.releaseYear !== undefined ? { releaseYear: dto.releaseYear } : {}),
@@ -272,4 +292,18 @@ export class AnimeService {
 
     return genreIds;
   }
+}
+
+// Other names as typed by an admin: trimmed, de-duplicated, never repeating the title.
+function cleanNames(title: string, names: string[] | undefined) {
+  const seen = new Set([title.trim().toLowerCase()]);
+  const result: string[] = [];
+  for (const name of names ?? []) {
+    const value = name.trim();
+    if (value && !seen.has(value.toLowerCase())) {
+      seen.add(value.toLowerCase());
+      result.push(value);
+    }
+  }
+  return result;
 }

@@ -3,13 +3,15 @@
 // The viewer's own checklist: every work they have rated, with the two scores they
 // gave, most recently changed first.
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useState, type FormEvent } from 'react';
+import { errorMessage } from '@/components/AuthLayout';
 import { Providers } from '@/app/providers';
 import { Colophon } from '@/components/collection/Colophon';
 import { Measure } from '@/components/collection/Measure';
 import { WorkImage } from '@/components/collection/WorkImage';
 import { SiteHeader } from '@/components/SiteHeader';
-import { myRatingsApi } from '@/lib/api';
+import { authApi, myRatingsApi } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth.store';
 import { formatCount, formatLabel, plural } from '@/lib/scores';
 
@@ -124,8 +126,83 @@ function MyRatings() {
             ) : null}
           </>
         )}
+        {user ? <DeleteAccount /> : null}
       </main>
       <Colophon showInvitation={false} />
     </div>
+  );
+}
+
+// Deleting an account removes the member, their ratings, notes, votes and reports
+// at once. The password is asked for again so a borrowed, signed-in device cannot.
+function DeleteAccount() {
+  const router = useRouter();
+  const logout = useAuthStore((state) => state.logout);
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setDeleting(true);
+    try {
+      await authApi.deleteAccount(password);
+      await logout();
+      router.push('/');
+    } catch (err) {
+      setError(errorMessage(err, 'The account was not deleted. Check your password and try again.'));
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <section className="section account" aria-labelledby="account-title">
+      <div className="section__head">
+        <h2 id="account-title" className="title-m">
+          Your account
+        </h2>
+      </div>
+      {open ? (
+        <form className="form account__form" onSubmit={submit}>
+          <p className="prose">This deletes your account with every rating, note, vote and report you have made. It cannot be undone.</p>
+          {error ? (
+            <p role="alert" className="notice notice--error">
+              {error}
+            </p>
+          ) : null}
+          <div className="field">
+            <label className="field__label signage" htmlFor="delete-password">
+              Your password, to confirm
+            </label>
+            <input
+              id="delete-password"
+              className="input"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </div>
+          <p className="account__actions">
+            <button type="submit" className="btn btn--danger btn--sm" disabled={deleting || !password}>
+              {deleting ? 'Deleting…' : 'Delete my account'}
+            </button>
+            <button type="button" className="text-action" onClick={() => setOpen(false)}>
+              Keep my account
+            </button>
+          </p>
+        </form>
+      ) : (
+        <p className="account__actions">
+          <span className="muted">Leaving? Your account and everything you posted can be deleted here.</span>
+          <button type="button" className="text-action" onClick={() => setOpen(true)}>
+            Delete my account…
+          </button>
+        </p>
+      )}
+    </section>
   );
 }

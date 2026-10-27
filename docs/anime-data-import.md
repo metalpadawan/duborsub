@@ -52,15 +52,19 @@ No open source records which titles have an English dub, so it comes from the pe
 
 Imports never change a title's dub flag.
 
-## AniList (when its API is available)
-
-AniList adds synopses and English titles to its most popular titles:
+## Synopses and English titles from AniList
 
 ```powershell
-npm --prefix apps/anirate-base/backend run import:anime:anilist -- --pages 5 --per-page 50
+npm --prefix apps/anirate-base/backend run refresh:anime:synopses
 ```
 
-To review AniList's whole catalogue as a file first, `export:anime:anilist` writes `.data/catalog/anilist-anime.json` and `.csv`, paced at AniList's rate limit; rerun with `-- --resume` if it stops. Both commands report AniList's own error message when it refuses requests (its API was disabled for stability problems in October 2026).
+This exports every title AniList knows (about 17,000, requested by the AniList ids the offline list already holds, 50 at a time at AniList's rate limit, about fifteen minutes) to `.data/catalog/anilist-anime.json`, then fills each catalogue title's missing synopsis, English title, other names, cover and genres. It never replaces a synopsis or title someone already set, so it is safe to rerun. The two steps are `export:anime:anilist` (rerun with `-- --resume` if it stops) and `import:anime:anilist -- --from-export` (add `-- --dry-run` to see the counts first).
+
+`import:anime:anilist -- --pages 5` instead refreshes AniList's most popular titles directly. Both report AniList's own error message when it refuses requests; its API was briefly disabled for stability problems in October 2026.
+
+## Titles people ask for
+
+Visitors who cannot find a title can request it at `/request`, or straight from a search with no results. Requests for the same title are counted together, and admins see the most-requested first under **Requests** at `/admin`, where "Add to catalogue" keys the title in (with other names, format, episodes, dub flag, cover and synopsis) and marks the request done.
 
 ## Moving From The Old File Datastore
 

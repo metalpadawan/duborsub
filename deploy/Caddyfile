@@ -1,0 +1,11 @@
+# Caddy obtains and renews HTTPS certificates for both domains automatically; point
+# their DNS A records at this server first.
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy backend:4000
+}

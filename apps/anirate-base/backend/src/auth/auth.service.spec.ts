@@ -6,6 +6,7 @@ import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuthService, ROTATION_GRACE_MS } from './auth.service';
 import { LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth.dto';
+import { MailService } from '../mail/mail.service';
 import { MonitoringService } from '../monitoring/monitoring.service';
 import { createTestPrisma, createUser as insertUser, resetDatabase } from '../test-utils/database';
 
@@ -26,6 +27,8 @@ describe('AuthService', () => {
   let config: ConfigService;
   let monitoring: MonitoringService;
   let configValues: Record<string, unknown>;
+  let mail: MailService;
+  let sent: Array<{ kind: string; to: string; link: string }>;
 
   beforeEach(() => {
     jwt = {
@@ -38,7 +41,18 @@ describe('AuthService', () => {
       REFRESH_TOKEN_TTL_HOURS: 24,
       JWT_ISSUER: 'anirate-api',
       JWT_AUDIENCE: 'anirate-web',
+      FRONTEND_URL: 'http://localhost:3000',
     };
+
+    sent = [];
+    mail = {
+      sendEmailVerification: jest.fn(async (to: string, _username: string, link: string) => {
+        sent.push({ kind: 'verify', to, link });
+      }),
+      sendPasswordReset: jest.fn(async (to: string, _username: string, link: string) => {
+        sent.push({ kind: 'reset', to, link });
+      }),
+    } as unknown as MailService;
 
     config = {
       get: jest.fn().mockImplementation((key: string, fallback?: string) => {
@@ -59,7 +73,7 @@ describe('AuthService', () => {
   });
 
   it('registers a new user, lowercases the email, and persists the change', async () => {
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
     const dto: RegisterDto = {
       username: 'NewUser',
       email: 'NewUser@Example.com',
@@ -78,7 +92,7 @@ describe('AuthService', () => {
 
   it('rejects invalid credentials and records the failed attempt', async () => {
     const user = await createUser();
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
     const dto: LoginDto = {
       email: user.email,
       password: 'DefinitelyWrong123!',
@@ -91,7 +105,7 @@ describe('AuthService', () => {
 
   it('locks an account after too many failed login attempts', async () => {
     const user = await createUser({ failedLoginAttempts: 4 });
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     await expect(
       service.login(
@@ -111,7 +125,7 @@ describe('AuthService', () => {
 
   it('returns tokens and rotates refresh sessions on successful login and refresh', async () => {
     const user = await createUser();
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     const loginResult = await service.login(
       {
@@ -138,7 +152,7 @@ describe('AuthService', () => {
 
   it('rejects refresh requests when the original session is missing', async () => {
     await createUser();
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     await expect(service.refresh('missing-token', '127.0.0.1', 'jest')).rejects.toBeInstanceOf(
       UnauthorizedException,
@@ -147,7 +161,7 @@ describe('AuthService', () => {
 
   it('revokes every session when a rotated refresh token is reused after the grace window', async () => {
     const user = await createUser();
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     const loginResult = await service.login(
       {
@@ -174,7 +188,7 @@ describe('AuthService', () => {
 
   it('rejects a just-rotated token without revoking the session that replaced it', async () => {
     const user = await createUser();
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     const loginResult = await service.login({ email: user.email, password: 'Password123!' }, '127.0.0.1', 'jest');
     const rotated = await service.refresh(loginResult.refreshToken, '127.0.0.1', 'jest');
@@ -190,7 +204,7 @@ describe('AuthService', () => {
 
   it('keeps the session when the user agent changes, and records the mismatch', async () => {
     const user = await createUser();
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     const loginResult = await service.login({ email: user.email, password: 'Password123!' }, '127.0.0.1', 'Browser/1');
 
@@ -204,7 +218,7 @@ describe('AuthService', () => {
 
   it('does not reveal lock status to someone with the wrong password', async () => {
     const user = await createUser({ failedLoginAttempts: 5, lockedUntil: new Date(Date.now() + 60_000) });
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     await expect(
       service.login({ email: user.email, password: 'DefinitelyWrong123!' }, '127.0.0.1', 'jest'),
@@ -217,7 +231,7 @@ describe('AuthService', () => {
 
   it('starts the failed-attempt count over once a lock has expired', async () => {
     const user = await createUser({ failedLoginAttempts: 5, lockedUntil: new Date(Date.now() - 1_000) });
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     await expect(
       service.login({ email: user.email, password: 'DefinitelyWrong123!' }, '127.0.0.1', 'jest'),
@@ -229,7 +243,7 @@ describe('AuthService', () => {
   });
 
   it('runs a password comparison even when the email is unknown', async () => {
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
     // Spy on the CommonJS module object; the namespace import's properties are read-only.
     const compare = jest.spyOn(jest.requireActual<typeof bcrypt>('bcrypt'), 'compare');
 
@@ -242,7 +256,7 @@ describe('AuthService', () => {
   });
 
   it('lets only one of two concurrent registrations for the same email succeed', async () => {
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
     const dto: RegisterDto = { username: 'racer', email: 'racer@example.com', password: 'Password123!' };
 
     const results = await Promise.allSettled([
@@ -259,7 +273,7 @@ describe('AuthService', () => {
 
   it('does not return the reset token unless EXPOSE_RESET_TOKEN is enabled', async () => {
     const user = await createUser();
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     const response = await service.forgotPassword({ email: user.email });
 
@@ -270,7 +284,7 @@ describe('AuthService', () => {
   it('issues a debug reset token when enabled and updates the password when it is used', async () => {
     configValues.EXPOSE_RESET_TOKEN = true;
     const user = await createUser();
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     const forgotPassword = await service.forgotPassword({ email: user.email });
 
@@ -294,7 +308,7 @@ describe('AuthService', () => {
 
   it('lets only one of two simultaneous refreshes rotate the same token', async () => {
     const user = await createUser();
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
     const { refreshToken } = await service.login({ email: user.email, password: 'Password123!' }, '127.0.0.1', 'jest');
 
     const results = await Promise.allSettled([
@@ -306,12 +320,74 @@ describe('AuthService', () => {
     expect((await tokens()).filter((token) => token.revokedAt === null)).toHaveLength(1);
   });
 
+  it('emails a confirmation link at sign-up that confirms the address once', async () => {
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
+    const created = await service.register({ username: 'fresh', email: 'Fresh@Example.com', password: 'Password123!' });
+
+    expect(created.emailVerified).toBe(false);
+    expect(sent).toEqual([expect.objectContaining({ kind: 'verify', to: 'fresh@example.com' })]);
+    const token = new URL(sent[0].link).searchParams.get('token') as string;
+    expect(sent[0].link.startsWith('http://localhost:3000/verify-email?token=')).toBe(true);
+
+    await service.verifyEmail(token);
+    expect((await service.getMe(created.id)).emailVerified).toBe(true);
+    await expect(service.verifyEmail(token)).rejects.toThrow('expired or was already used');
+  });
+
+  it('makes only the newest confirmation link work', async () => {
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
+    const created = await service.register({ username: 'twice', email: 'twice@example.com', password: 'Password123!' });
+
+    await service.resendVerification(created.id);
+    const [first, second] = sent.map((entry) => new URL(entry.link).searchParams.get('token') as string);
+
+    await expect(service.verifyEmail(first)).rejects.toThrow();
+    await expect(service.verifyEmail(second)).resolves.toEqual({ message: 'Email address confirmed' });
+  });
+
+  it('emails the reset link instead of only storing it', async () => {
+    const user = await createUser();
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
+
+    await service.forgotPassword({ email: user.email });
+
+    expect(sent).toEqual([expect.objectContaining({ kind: 'reset', to: user.email })]);
+    expect(sent[0].link.startsWith('http://localhost:3000/reset-password?token=')).toBe(true);
+  });
+
+  it('deletes an account with everything it posted, and recounts the titles it rated', async () => {
+    const user = await createUser();
+    const other = await insertUser(prisma, { id: 'user-2', username: 'other', email: 'other@example.com' });
+    await prisma.anime.create({ data: { id: 'mal-1', title: 'Rated', sortTitle: 'rated', searchText: 'rated' } });
+    await prisma.rating.createMany({
+      data: [
+        { id: 'r1', userId: user.id, animeId: 'mal-1', subRating: 1 },
+        { id: 'r2', userId: other.id, animeId: 'mal-1', subRating: 5 },
+      ],
+    });
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
+
+    await expect(service.deleteAccount(user.id, 'WrongPassword1!')).rejects.toBeInstanceOf(UnauthorizedException);
+    await service.deleteAccount(user.id, 'Password123!');
+
+    expect(await prisma.user.findUnique({ where: { id: user.id } })).toBeNull();
+    expect(await prisma.rating.count()).toBe(1);
+    expect(await prisma.anime.findUniqueOrThrow({ where: { id: 'mal-1' } })).toMatchObject({ totalVotes: 1, avgSubRating: 5 });
+  });
+
+  it('refuses to let an admin delete their own account here', async () => {
+    const admin = await createUser({ role: 'admin' });
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
+
+    await expect(service.deleteAccount(admin.id, 'Password123!')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('blocks login for a currently banned user', async () => {
     const user = await createUser({
       isBanned: true,
       bannedUntil: new Date(Date.now() + 60_000),
     });
-    const service = new AuthService(prisma, jwt, config, monitoring);
+    const service = new AuthService(prisma, jwt, config, monitoring, mail);
 
     await expect(
       service.login(

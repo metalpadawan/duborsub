@@ -21,6 +21,12 @@ enum AnimeStatus {
   upcoming
 }
 
+enum TitleRequestStatus {
+  pending
+  added
+  rejected
+}
+
 enum AnimeFormat {
   TV
   MOVIE
@@ -43,6 +49,8 @@ model User {
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime? @map("locked_until") @db.Timestamptz()
   lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz()
+  // Set once the owner follows the link emailed at sign-up; writes need it.
+  emailVerifiedAt     DateTime? @map("email_verified_at") @db.Timestamptz()
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -53,6 +61,10 @@ model User {
   refreshTokens       RefreshToken[]
   adminLogs           AdminLog[]
   dubReports          DubReport[]
+  emailVerificationTokens EmailVerificationToken[]
+  titleRequests       TitleRequest[] @relation("RequestedBy")
+  resolvedRequests    TitleRequest[] @relation("ResolvedBy")
+  commentReports      CommentReport[]
 
   @@map("users")
 }
@@ -97,6 +109,7 @@ model Anime {
   ratings           Rating[]
   comments          Comment[]
   dubReports        DubReport[]
+  titleRequests     TitleRequest[]
 
   @@index([sortTitle])
   @@index([popularity(sort: Desc)])
@@ -158,6 +171,7 @@ model Comment {
   parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies   Comment[]     @relation("CommentReplies")
   likes     CommentLike[]
+  reports   CommentReport[]
 
   @@index([animeId, parentId, createdAt])
   @@index([parentId])
@@ -239,4 +253,60 @@ model AdminLog {
 
   @@index([createdAt(sort: Desc)])
   @@map("admin_logs")
+}
+
+model EmailVerificationToken {
+  id        String    @id
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz()
+  usedAt    DateTime? @map("used_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+// A title someone could not find, sent in for an admin to review and add.
+model TitleRequest {
+  id           String             @id
+  title        String             @db.VarChar(255)
+  // Folded title, so repeat requests for the same show are counted together.
+  titleKey     String             @map("title_key")
+  details      String             @default("")
+  link         String?
+  // How many times it was asked for while pending.
+  requestCount Int                @default(1) @map("request_count")
+  status       TitleRequestStatus @default(pending)
+  adminNote    String?            @map("admin_note")
+  userId       String?            @map("user_id")
+  animeId      String?            @map("anime_id") @db.VarChar(64)
+  resolvedById String?            @map("resolved_by_id")
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz()
+  resolvedAt   DateTime?          @map("resolved_at") @db.Timestamptz()
+
+  user         User?              @relation("RequestedBy", fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy   User?              @relation("ResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  anime        Anime?             @relation(fields: [animeId], references: [id], onDelete: SetNull)
+
+  @@index([status, requestCount(sort: Desc)])
+  @@index([titleKey])
+  @@map("title_requests")
+}
+
+// A viewer flagging a note for the moderators.
+model CommentReport {
+  id        String   @id
+  commentId String   @map("comment_id")
+  userId    String   @map("user_id")
+  reason    String?  @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@map("comment_reports")
 }

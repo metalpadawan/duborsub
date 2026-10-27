@@ -11,6 +11,14 @@ out/
 .env.*
 !.env.example
 !.env.local.example
+!.env.production.example
 apps/anirate-base/backend/.data/
 .DS_Store
 Thumbs.db
+
+# Database backups (database/backup.mjs)
+backups/
+
+# Playwright output
+test-results/
+playwright-report/

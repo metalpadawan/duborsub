@@ -152,3 +152,26 @@ describe('AnimeService', () => {
     await expect(service.findOne('anilist-21')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+describe('AnimeService for admins', () => {
+  it('keys in a title with its other names, format and episodes, searchable by any name', async () => {
+    const created = await service.create({ title: 'Kaiba', alternativeTitles: ['カイバ', ' Kaiba ', 'Kaiba (2008)'], format: 'TV', episodes: 12 });
+
+    expect(created).toMatchObject({ title: 'Kaiba', format: 'TV', episodes: 12, alternativeTitles: ['カイバ', 'Kaiba (2008)'] });
+    expect(ids(await service.findAll({ search: 'カイバ', page: 1, limit: 20 }))).toEqual([created.id]);
+
+    await service.update(created.id, { alternativeTitles: ['Kaiba: The Memory Thief'] });
+    expect(ids(await service.findAll({ search: 'memory thief', page: 1, limit: 20 }))).toEqual([created.id]);
+  });
+
+  it('lists every id in chunks for the sitemap', async () => {
+    await createAnime(prisma, { id: 'a-1' });
+    await createAnime(prisma, { id: 'a-2' });
+    await createAnime(prisma, { id: 'a-3' });
+
+    const second = await service.sitemap({ page: 2, size: 2 });
+
+    expect(second.total).toBe(3);
+    expect(second.items.map((item) => item.id)).toEqual(['a-3']);
+  });
+});

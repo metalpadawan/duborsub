@@ -15,7 +15,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AnimeService } from './anime.service';
-import { AnimeQueryDto, CreateAnimeDto, UpdateAnimeDto } from './dto/anime.dto';
+import { AnimeQueryDto, CreateAnimeDto, SitemapQueryDto, UpdateAnimeDto } from './dto/anime.dto';
 
 @Controller('anime')
 export class AnimeController {
@@ -26,10 +26,15 @@ export class AnimeController {
     return this.animeService.findAll(query);
   }
 
-  // Declared before ':id' so "genres" is not read as an anime id.
+  // Declared before ':id' so "genres" and "sitemap" are not read as anime ids.
   @Get('genres')
   genres() {
     return this.animeService.listGenres();
+  }
+
+  @Get('sitemap')
+  sitemap(@Query() query: SitemapQueryDto) {
+    return this.animeService.sitemap(query);
   }
 
   @Get(':id')

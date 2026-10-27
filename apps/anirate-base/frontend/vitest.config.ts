@@ -15,5 +15,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     testTimeout: 10_000,
+    // The browser tests in e2e/ run under Playwright (npm run test:e2e).
+    exclude: ['**/node_modules/**', 'e2e/**'],
   },
 });

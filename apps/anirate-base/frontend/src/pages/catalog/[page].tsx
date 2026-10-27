@@ -47,6 +47,6 @@ export const getStaticProps: GetStaticProps<HomeProps> = async ({ params }) => {
 
   return {
     props,
-    revalidate: 60,
+    revalidate: props.isDemo ? 1 : 60,
   };
 };

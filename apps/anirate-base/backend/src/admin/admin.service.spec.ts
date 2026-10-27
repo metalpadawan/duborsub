@@ -2,13 +2,21 @@ import { afterAll, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { ForbiddenException } from '@nestjs/common';
 import { CommentsService } from '../comments/comments.service';
 import { DubReportsService } from '../dub-reports/dub-reports.service';
+import { AnimeService } from '../anime/anime.service';
 import { MonitoringService } from '../monitoring/monitoring.service';
+import { TitleRequestsService } from '../title-requests/title-requests.service';
 import { createAnime, createTestPrisma, createUser, resetDatabase } from '../test-utils/database';
 import { AdminService } from './admin.service';
 
 const prisma = createTestPrisma();
 const monitoring = { recordSecurityEvent: jest.fn() } as unknown as MonitoringService;
-const service = new AdminService(prisma, new CommentsService(prisma), monitoring, new DubReportsService(prisma));
+const service = new AdminService(
+  prisma,
+  new CommentsService(prisma),
+  monitoring,
+  new DubReportsService(prisma),
+  new TitleRequestsService(prisma, new AnimeService(prisma)),
+);
 
 beforeEach(async () => {
   await resetDatabase(prisma);

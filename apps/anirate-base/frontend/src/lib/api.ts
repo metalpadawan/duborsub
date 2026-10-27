@@ -185,6 +185,14 @@ export const authApi = {
     api.post('/auth/forgot-password', { email }, { skipAuthRefresh: true } as RetryableConfig),
   resetPassword: (token: string, newPassword: string) =>
     api.post('/auth/reset-password', { token, newPassword }, { skipAuthRefresh: true } as RetryableConfig),
+  verifyEmail: (token: string) => api.post('/auth/verify-email', { token }, { skipAuthRefresh: true } as RetryableConfig),
+  resendVerification: () => api.post('/auth/resend-verification'),
+  deleteAccount: (password: string) => api.delete('/auth/me', { data: { password } }),
+};
+
+export const titleRequestsApi = {
+  create: (data: { title: string; details?: string; link?: string; website?: string }) =>
+    api.post<TitleRequestResult>('/title-requests', data, { skipAuthRefresh: true } as RetryableConfig),
 };
 
 export const animeApi = {
@@ -223,6 +231,14 @@ export const adminApi = {
   ban: (userId: string, data: { reason?: string; durationDays?: number }) => api.post(`/admin/users/${userId}/ban`, data),
   unban: (userId: string) => api.post(`/admin/users/${userId}/unban`),
   logs: (page = 1) => api.get<Paginated<AdminLogItem>>('/admin/logs', { params: { page } }),
+  titleRequests: (status: 'pending' | 'added' | 'rejected' = 'pending', page = 1) =>
+    api.get<Paginated<AdminTitleRequest>>('/admin/title-requests', { params: { status, page } }),
+  resolveTitleRequest: (id: string, data: { status: 'added' | 'rejected'; animeId?: string; note?: string }) =>
+    api.post(`/admin/title-requests/${id}/resolve`, data),
+  commentReports: () => api.get<{ items: AdminCommentReport[] }>('/admin/comment-reports'),
+  dismissCommentReports: (commentId: string) => api.post(`/admin/comment-reports/${commentId}/dismiss`),
+  recentComments: (page = 1) => api.get<Paginated<AdminComment>>('/admin/comments', { params: { page } }),
+  removeComment: (commentId: string) => api.delete(`/admin/comments/${commentId}`),
 };
 
 export const commentsApi = {
@@ -238,6 +254,8 @@ export const commentsApi = {
     api.post(`/anime/${animeId}/comments/${commentId}/like`, { value }),
   unlike: (animeId: string, commentId: string) =>
     api.delete(`/anime/${animeId}/comments/${commentId}/like`),
+  report: (animeId: string, commentId: string, reason?: string) =>
+    api.post(`/anime/${animeId}/comments/${commentId}/report`, reason ? { reason } : {}),
 };
 
 export interface User {
@@ -245,6 +263,40 @@ export interface User {
   username: string;
   email: string;
   role: 'user' | 'admin';
+  emailVerified: boolean;
+}
+
+export interface TitleRequestResult {
+  status: 'received' | 'already-requested';
+  possibleMatches: Array<Pick<Anime, 'id' | 'title' | 'releaseYear' | 'format'>>;
+}
+
+export interface AdminTitleRequest {
+  id: string;
+  title: string;
+  details: string;
+  link: string | null;
+  requestCount: number;
+  status: 'pending' | 'added' | 'rejected';
+  adminNote: string | null;
+  animeId: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  user: { username: string } | null;
+}
+
+export interface AdminComment {
+  id: string;
+  content: string;
+  isDeleted: boolean;
+  createdAt: string;
+  user: { id: string; username: string } | null;
+  anime: { id: string; title: string };
+  reports: number;
+}
+
+export interface AdminCommentReport extends AdminComment {
+  reasons: string[];
 }
 
 export interface RegisterPayload {
@@ -321,6 +373,8 @@ export interface AdminDashboard {
     totalRatings: number;
     totalComments: number;
     pendingDubReports: number;
+    pendingTitleRequests: number;
+    reportedComments: number;
   };
   topRatedAnime: Array<{ id: string; title: string }>;
   recentActivity: AdminLogItem[];
@@ -363,6 +417,9 @@ export interface AnimeQuery {
 
 export interface CreateAnimePayload {
   title: string;
+  alternativeTitles?: string[];
+  format?: string;
+  episodes?: number;
   description?: string;
   coverImageUrl?: string;
   releaseYear?: number;

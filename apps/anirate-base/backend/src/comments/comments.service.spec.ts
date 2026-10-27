@@ -75,3 +75,33 @@ describe('CommentsService', () => {
     await expect(service.vote('user-2', 'anime-1', 'comment-1', { value: 1 })).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('CommentsService moderation', () => {
+  it('takes one report per viewer, never on their own note, and lists the most reported first', async () => {
+    await createUser(prisma, { id: 'user-3', username: 'third' });
+
+    await expect(service.report('user-1', 'anime-1', 'comment-1', {})).rejects.toBeInstanceOf(BadRequestException);
+    await service.report('user-2', 'anime-1', 'comment-1', { reason: 'Spoilers' });
+    await service.report('user-2', 'anime-1', 'comment-1', { reason: 'Again' });
+    await service.report('user-3', 'anime-1', 'comment-1', {});
+    await service.report('user-1', 'anime-2', 'comment-2', { reason: 'Rude' });
+
+    const { items } = await service.listReported();
+    expect(items.map((item) => [item.id, item.reports])).toEqual([
+      ['comment-1', 2],
+      ['comment-2', 1],
+    ]);
+    expect(items[0]).toMatchObject({ reasons: ['Spoilers'], anime: { id: 'anime-1' }, user: { username: 'demo' } });
+  });
+
+  it('settles the reports when a moderator removes the note or dismisses them', async () => {
+    await service.report('user-2', 'anime-1', 'comment-1', {});
+    await service.report('user-1', 'anime-2', 'comment-2', {});
+
+    await service.softDeleteByAdmin('comment-1');
+    await service.dismissReports('comment-2');
+
+    expect((await service.listReported()).items).toEqual([]);
+    expect((await service.listRecent(1, 20)).items.find((item) => item.id === 'comment-1')).toMatchObject({ isDeleted: true });
+  });
+});

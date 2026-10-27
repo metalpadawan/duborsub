@@ -28,6 +28,8 @@ export type HomeProps = {
   page: number;
   totalItems: number;
   totalPages: number;
+  /** True when the bundled demo catalogue stood in for the API. */
+  isDemo: boolean;
 };
 
 export function defaultSortFor(search: string): SortKey {

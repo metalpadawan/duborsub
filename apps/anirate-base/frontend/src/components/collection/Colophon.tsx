@@ -29,6 +29,17 @@ export function Colophon({ showInvitation = true }: { showInvitation?: boolean }
             <span className="brand__mark" aria-hidden="true" />
             AniRate
           </a>
+          <nav className="colophon__links" aria-label="About AniRate">
+            <a className="link" href="/request">
+              Request a title
+            </a>
+            <a className="link" href="/privacy">
+              Privacy
+            </a>
+            <a className="link" href="/terms">
+              Terms
+            </a>
+          </nav>
           <p>
             Catalogue metadata from AniList and{' '}
             <a className="link" href="https://github.com/manami-project/anime-offline-database">
